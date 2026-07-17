@@ -1,0 +1,22 @@
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+
+# Local tool and agent state
+.codegraph/
+.playwright-mcp/
+.omo/
+.codex/
+.giter/
+.giter-agent.toml
+.giter-terminal.log
+
+# Generated runtime evidence
+artifacts/benchmarks/
+artifacts/performance/
+
+# Build outputs
+bin/
+coverage.out
+*.test

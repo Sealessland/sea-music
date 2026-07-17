@@ -1,0 +1,58 @@
+{
+  "uid": "sea-music-operations",
+  "title": "Sea Music Operations",
+  "schemaVersion": 42,
+  "version": 1,
+  "refresh": "10s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "HTTP request rate by bounded route",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "targets": [{"expr": "sum by (route, method) (rate(sea_music_http_requests_total[5m]))", "legendFormat": "{{method}} {{route}}"}]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "HTTP server errors",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "targets": [{"expr": "sum by (route) (rate(sea_music_http_errors_total[5m]))", "legendFormat": "{{route}}"}]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Outbox backlog and processing jobs",
+      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "sea_music_outbox_events", "legendFormat": "outbox {{state}}"},
+        {"expr": "sea_music_processing_jobs", "legendFormat": "media {{state}}"}
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "SQL and Redis pool utilization",
+      "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "sea_music_sql_connections", "legendFormat": "sql {{state}}"},
+        {"expr": "sea_music_redis_connections", "legendFormat": "redis {{state}}"}
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Counter drift repaired",
+      "gridPos": {"x": 0, "y": 16, "w": 8, "h": 5},
+      "targets": [{"expr": "sea_music_counter_drift_total", "legendFormat": "drift"}]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Oldest Outbox event (seconds)",
+      "gridPos": {"x": 8, "y": 16, "w": 8, "h": 5},
+      "targets": [{"expr": "sea_music_outbox_oldest_seconds", "legendFormat": "age"}]
+    }
+  ]
+}

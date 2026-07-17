@@ -1,0 +1,122 @@
+{
+  "meta": {
+    "schemaVersion": 11
+  },
+  "profile": {
+    "name": "高胤瑞",
+    "title": "",
+    "phone": "13888798347",
+    "email": "2692231726@qq.com",
+    "website": "https://github.com/sealessland",
+    "personalDetails": [
+      {
+        "id": "personal-detail-1",
+        "label": "英语",
+        "value": "CET-4 / CET-6 已通过"
+      },
+      {
+        "id": "personal-detail-2",
+        "label": "AI工具",
+        "value": "主要使用 OMP / Codex 辅助需求拆解、实现、调试、测试和文档沉淀，也使用过 Claude Code 等 Coding Agent 工具。"
+      }
+    ],
+    "photo": "",
+    "photoMeta": null
+  },
+  "educations": [
+    {
+      "id": "education-1",
+      "hidden": false,
+      "logo": "",
+      "school": "电子科技大学(985)",
+      "degree": "本科",
+      "major": "物联网工程",
+      "studyPeriod": "2023-2027"
+    }
+  ],
+  "skills": "**编程与工程实现**：熟悉 **Go / Python** 开发，能够完成后端接口实现、状态流转、错误处理、基础测试验证与多服务联调。\n**AI Agent 工程**：熟悉基于 **CloudWeGo Eino** 的 Agent 编排方式，实践过 ReAct、Tool Calling、多 Agent 协作、SSE 诊断流和结构化 RCA 报告生成，能够把模型能力接入真实业务链路。\n**知识增强与检索**：熟悉 **Neo4j 历史经验图谱、Milvus 文档向量检索、本地语义 Embedding（fastembed-go + ONNX Runtime）**；能够将历史案例、文档证据与运行时信号组合进诊断流程。\n**后端基础设施**：熟悉 **PostgreSQL、Redis、Kafka、S3 对象存储、FFmpeg、Docker / Docker Compose**，实践过事务消息、异步任务、媒体处理、缓存与数据一致性。\n**可观测性与 AI Native 工作方式**：熟悉 **OpenTelemetry、Prometheus、Grafana、Tempo** 的基本使用；习惯使用 Coding Agent 辅助需求拆解、实现、测试和排障，并通过人工 Review 与真实命令执行控制输出质量。",
+  "internships": [],
+  "projects": [
+    {
+      "id": "project-agentops-copilot-enhanced",
+      "hidden": false,
+      "name": "AgentOps 故障诊断平台",
+      "role": "独立设计/开发",
+      "period": "",
+      "tags": "Go, Gin, CloudWeGo Eino, PostgreSQL, Redis, Neo4j, Milvus, Prometheus, Grafana, React, TypeScript, Docker Compose",
+      "summary": "基于 **Go / Gin + CloudWeGo Eino** 的 AIOps 多 Agent 故障诊断平台。实现从 incident 创建、后台任务投递、两阶段多 Agent 取证、经验回查、证据审计到 LLM 综合 RCA 的完整链路。",
+      "highlights": "**设计多 Agent 两阶段工作流**：POST /api/diag/run 进入 Orchestrator 后，第一轮固定并行执行 Metrics Agent 与 Log Agent，形成实时故障画像；Planner 根据 Evidence Board 决策是否进入第二轮 Experience Agent；最后由 Synthesizer 输出结构化诊断报告。\n**按证据源拆分 Agent**：Metrics Agent 对接 **Prometheus / PromQL**，Log Agent 对接日志检索，Experience Agent 同时对接 **Neo4j 历史经验图谱、Milvus 传统向量 RAG、MCP: CodeGraph 能力**，形成实时证据、历史案例证据、文档证据与代码定位信息联合诊断。\n**实现 Experience 增强层**：在 **Neo4j** 中维护服务依赖、实例、指标、日志模式、代码路径、历史故障与 Runbook 关系图；在 **Milvus** 中对 RedCart README、架构文档、OpenAPI、代码知识块做本地语义 embedding 入库，实现 **GraphRAG + Vector RAG** 双通道经验回查。\n**接入本地语义 Embedding 与代码级证据增强**：使用 **fastembed-go + ONNX Runtime** 作为本地 embedding 运行时，完成 Milvus collection 建立、文档分块、向量写入、topK 检索；Experience Agent 可进一步调用 CodeGraph 索引可疑代码所在文件与相关符号。\n**落地 Eino Callback 审计链路**：通过 callback 持久化 thought / action / observation 到 agent_steps，并记录 tool_calls 的 request / response / status，实现诊断过程可审计、可回放、可复盘。\n**实现 SSE 实时诊断流与前端证据回放**：前端通过 Server-Sent Events 接收 plan、planner_decision、agent_start、agent_done、final 事件，展示 Agent 时间线、工具调用记录、增强版 React Flow 证据图和 Markdown 诊断报告。\n**补齐工程质量**：完成 build / test / vet / 400 行约束校验，Go 侧测试覆盖率提升到 **69.4%**，覆盖 API、tool、repository、cache、memory、vectorrag、orchestrator 等关键模块。"
+    },
+    {
+      "id": "project-sea-music",
+      "hidden": false,
+      "name": "Sea Music UGC 视频社区",
+      "role": "独立设计/开发",
+      "period": "2026.07",
+      "tags": "Go, PostgreSQL, Redis, Kafka, S3, FFmpeg, OpenTelemetry, Prometheus, Grafana, Tempo, Docker Compose",
+      "summary": "面向 Bilibili 类场景的 **UGC 视频社区后端**，采用模块化单体 API + 独立 Worker，完整实现身份认证、S3 直传、真实媒体处理、审核发布、社交互动、内容发现、可靠事件、可观测性与故障恢复。",
+      "highlights": "**设计模块化单体 + Worker 架构**：按 identity / video / social / discovery 拆分 Go package 与 PostgreSQL schema，并用架构测试限制领域包直接依赖；将 ffmpeg 转码、事件投影和数据对账下沉独立 Worker，在保留同库事务能力的同时隔离重任务故障域。\n**实现视频投稿与审核状态机**：设计 draft / uploaded / processing / review / published / failed / withdrawn 状态流转，以 expected_version 条件更新结合 SELECT FOR UPDATE 处理并发冲突；通过 S3 预签名直传、大小/类型/SHA-256 复核、权限审核和短期签名播放地址完成发布闭环。\n**落地可恢复的媒体处理任务**：Worker 使用 **ffprobe / FFmpeg** 校验时长与分辨率，生成 H.264/AAC 播放文件和封面并回写 S3；通过 SKIP LOCKED、任务租约、心跳续租、有界超时、稳定对象 key 和失败重试支持 Worker 崩溃后的恢复与重复执行。\n**构建至少一次可靠事件链路**：使用 **Transactional Outbox → Kafka → Inbox** 解耦投稿、社交计数和热门投影，等待 broker ack 后更新 Outbox，并以稳定 event ID 去重；覆盖 ack 窗口崩溃、毒消息 DLQ/重放、指数退避和租约超时，不虚构端到端 exactly-once。\n**完善身份安全与流量治理**：使用 Argon2id 哈希密码并以 dummy hash 降低账号时序枚举风险；实现短期 Access JWT、Refresh Token Rotation 与 token family 重放撤销，基于 Redis Lua 令牌桶原子限流，并按接口错误成本选择 fail-open / fail-closed。\n**实现社交与内容发现**：支持点赞、收藏、关注、评论、弹幕及屏蔽关系；以 PostgreSQL 保存权威关系、Redis 投影计数并周期对账修复漂移，提供关注流、热门 ZSET 和规则推荐，缓存异常时回退数据库并标记 degraded。\n**建立可观测与可重放验证体系**：接入 HTTP / pgx / Redis / Kafka / FFmpeg 的 **OpenTelemetry** 链路，暴露 RED/USE、Outbox backlog 和业务指标，通过 Prometheus、Grafana、Tempo 验证 API 与 Worker trace；真实 E2E 覆盖 MP4 上传转码播放，故障演练覆盖积压、重复投递、毒消息和 Worker 中断。\n**以可复现 Benchmark 驱动优化**：通过 trace 与连接池指标定位 S3 签名 URL 热点，实现最多 10,000 项、感知过期且可关闭的进程内缓存；补充固定版本 k6 的 constant-arrival-rate 基准，采用固定 seed、80/20 访问分布、缓存 A/B 交替、CPU/内存约束和 P95/P99/错误/dropped iterations 阈值，并完整归档环境、原始时序和 SHA256。"
+    }
+  ],
+  "awards": [],
+  "certificates": [],
+  "selfSummary": {
+    "content": "习惯使用 OMP、Codex、Claude Code 等 Coding Agent 辅助需求拆解、接口实现、测试补充、日志分析和文档整理；重视代码质量、接口边界、验证流程和文档沉淀，能够把 AI 工具纳入日常开发闭环。保持对 AI Agent、检索增强、推理优化、可观测性和工程化实践的持续关注，愿意主动跟进业界最新进展，并把新能力转化为可落地、可维护的实际方案。\n",
+    "hidden": false
+  },
+  "sectionVisibility": {
+    "profile": true,
+    "education": true,
+    "skills": true,
+    "internships": false,
+    "projects": true,
+    "awards": false,
+    "certificates": false,
+    "selfSummary": true
+  },
+  "layout": {
+    "order": [
+      "skills",
+      "projects",
+      "internships",
+      "selfSummary",
+      "awards",
+      "certificates"
+    ]
+  },
+  "theme": {
+    "primaryColor": "#2563eb",
+    "nameColor": "",
+    "schoolColor": "",
+    "nameFont": "sans",
+    "nameFontSize": 18,
+    "schoolFont": "sans",
+    "schoolFontSize": 13,
+    "skillsFontSize": 11.8,
+    "internshipSummaryFontSize": 11.8,
+    "internshipHighlightsFontSize": 11.8,
+    "internshipTimeFontSize": 12,
+    "internshipCompanyMetaFontSize": 13,
+    "internshipRoleFontSize": 13,
+    "projectSummaryFontSize": 11.8,
+    "projectHighlightsFontSize": 11.6,
+    "projectNameFontSize": 12.6,
+    "projectMetaFontSize": 11.5,
+    "projectTagFontSize": 11,
+    "awardTitleFontSize": 13,
+    "awardMetaFontSize": 12,
+    "awardDescriptionFontSize": 12.5,
+    "certificateTitleFontSize": 13,
+    "certificateMetaFontSize": 12,
+    "certificateDescriptionFontSize": 12.5,
+    "selfSummaryFontSize": 11.8,
+    "boldMajor": false,
+    "educationFirst": true,
+    "photoConfig": {
+      "width": 96,
+      "height": 96,
+      "ratio": "1:1",
+      "lockRatio": true
+    }
+  }
+}

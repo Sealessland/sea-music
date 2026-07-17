@@ -1,0 +1,787 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Sea Music API",
+    "version": "0.1.0",
+    "description": "Versioned HTTP contract for the UGC video platform backend."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8080",
+      "description": "Local API base URL"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Operations",
+      "description": "Process liveness and service readiness"
+    },
+    {
+      "name": "Identity",
+      "description": "Account registration and sessions"
+    },
+    {
+      "name": "Videos",
+      "description": "Creator drafts and verified direct source uploads"
+    },
+    {
+      "name": "Social",
+      "description": "Idempotent relations, threaded comments, and time-windowed danmaku"
+    },
+    {
+      "name": "Discovery",
+      "description": "Visibility-filtered following, hot, and recommendation feeds"
+    }
+  ],
+  "paths": {
+    "/livez": {
+      "get": {
+        "operationId": "getLiveness",
+        "summary": "Check process liveness",
+        "tags": ["Operations"],
+        "responses": {
+          "200": {
+            "description": "The process event loop is serving requests.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestID"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "ok"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "getReadiness",
+        "summary": "Check required dependencies",
+        "tags": ["Operations"],
+        "responses": {
+          "200": {
+            "description": "The service can satisfy its current API contract.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestID"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "ready"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/users": {
+      "post": {
+        "operationId": "registerUser",
+        "summary": "Register an account",
+        "tags": ["Identity"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account registered.",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestID"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/sessions": {
+      "post": {
+        "operationId": "login",
+        "summary": "Create a rotating session",
+        "tags": ["Identity"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credentials accepted and session created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/refresh": {
+      "post": {
+        "operationId": "refreshSession",
+        "summary": "Rotate a refresh token",
+        "tags": ["Identity"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Refresh token rotated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "summary": "Get the authenticated user",
+        "tags": ["Identity"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authenticated account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/videos": {
+      "post": {
+        "operationId": "createVideoDraft",
+        "summary": "Create an authenticated creator draft",
+        "tags": ["Videos"],
+        "security": [{"BearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CreateVideoRequest"}}}},
+        "responses": {
+          "201": {"description": "Draft created.", "content": {"application/json": {"schema": {"type": "object", "required": ["video"], "properties": {"video": {"$ref": "#/components/schemas/Video"}}}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/api/v1/videos/{video_id}/uploads": {
+      "parameters": [{"name": "video_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+      "post": {
+        "operationId": "createVideoUploadGrant",
+        "summary": "Create a time-limited direct object upload grant",
+        "tags": ["Videos"],
+        "security": [{"BearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UploadRequest"}}}},
+        "responses": {
+          "201": {"description": "Signed upload grant created.", "content": {"application/json": {"schema": {"type": "object", "required": ["upload"], "properties": {"upload": {"$ref": "#/components/schemas/UploadGrant"}}}}}},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      }
+    },
+    "/api/v1/videos/{video_id}/finalize": {
+      "parameters": [{"name": "video_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+      "post": {
+        "operationId": "finalizeVideoUpload",
+        "summary": "Verify the uploaded object and enqueue processing exactly once",
+        "tags": ["Videos"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {"description": "Object verified and processing job returned.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FinalizeResult"}}}},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      }
+    },
+    "/api/v1/videos/{video_id}/review": {
+      "parameters": [{"name": "video_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+      "post": {
+        "operationId": "reviewVideo",
+        "summary": "Record a moderator decision and publish or reject the video",
+        "tags": ["Videos"],
+        "security": [{"BearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReviewVideoRequest"}}}},
+        "responses": {
+          "200": {"description": "Moderation decision applied.", "content": {"application/json": {"schema": {"type": "object", "required": ["video"], "properties": {"video": {"$ref": "#/components/schemas/Video"}}}}}},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "409": {"$ref": "#/components/responses/Conflict"}
+        }
+      }
+    },
+    "/api/v1/videos/{video_id}/withdraw": {
+      "parameters": [{"name": "video_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+      "post": {
+        "operationId": "withdrawVideo",
+        "summary": "Withdraw a published video",
+        "tags": ["Videos"],
+        "security": [{"BearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WithdrawVideoRequest"}}}},
+        "responses": {
+          "200": {"description": "Video withdrawn.", "content": {"application/json": {"schema": {"type": "object", "required": ["video"], "properties": {"video": {"$ref": "#/components/schemas/Video"}}}}}},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "409": {"$ref": "#/components/responses/Conflict"}
+        }
+      }
+    },
+    "/api/v1/videos/{video_id}": {
+      "parameters": [{"name": "video_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+      "get": {
+        "operationId": "getPublicVideo",
+        "summary": "Get published video details and short-lived media URLs",
+        "tags": ["Videos"],
+        "responses": {
+          "200": {"description": "Published video.", "content": {"application/json": {"schema": {"type": "object", "required": ["video"], "properties": {"video": {"$ref": "#/components/schemas/PublicVideo"}}}}}},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      }
+    },
+    "/api/v1/videos/{video_id}/like": {
+      "parameters": [{"name": "video_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+      "put": {"operationId": "likeVideo", "summary": "Idempotently like a video", "tags": ["Social"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "Current relation state.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RelationResult"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}},
+      "delete": {"operationId": "unlikeVideo", "summary": "Idempotently remove a like", "tags": ["Social"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "Current relation state.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RelationResult"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}}
+    },
+    "/api/v1/videos/{video_id}/favorite": {
+      "parameters": [{"name": "video_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+      "put": {"operationId": "favoriteVideo", "summary": "Idempotently favorite a video", "tags": ["Social"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "Current relation state.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RelationResult"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}},
+      "delete": {"operationId": "unfavoriteVideo", "summary": "Idempotently remove a favorite", "tags": ["Social"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "Current relation state.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RelationResult"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}}
+    },
+    "/api/v1/users/{user_id}/follow": {
+      "parameters": [{"name": "user_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+      "put": {"operationId": "followUser", "summary": "Idempotently follow a user", "tags": ["Social"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "Current relation state.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RelationResult"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}},
+      "delete": {"operationId": "unfollowUser", "summary": "Idempotently unfollow a user", "tags": ["Social"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "Current relation state.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RelationResult"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}}
+    },
+    "/api/v1/videos/{video_id}/comments": {
+      "parameters": [{"name": "video_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+      "post": {"operationId": "createComment", "summary": "Create a top-level comment or one-level reply", "tags": ["Social"], "security": [{"BearerAuth": []}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CreateCommentRequest"}}}}, "responses": {"201": {"description": "Comment created.", "content": {"application/json": {"schema": {"type": "object", "required": ["comment"], "properties": {"comment": {"$ref": "#/components/schemas/Comment"}}}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}},
+      "get": {"operationId": "listComments", "summary": "List comments with stable opaque cursor pagination", "tags": ["Social"], "parameters": [{"$ref": "#/components/parameters/Cursor"}, {"$ref": "#/components/parameters/Limit"}], "responses": {"200": {"description": "Comment page.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommentPage"}}}}}}
+    },
+    "/api/v1/comments/{comment_id}": {
+      "parameters": [{"name": "comment_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+      "delete": {"operationId": "deleteComment", "summary": "Replace a comment body with a thread-preserving tombstone", "tags": ["Social"], "security": [{"BearerAuth": []}], "responses": {"204": {"description": "Comment tombstoned."}, "401": {"$ref": "#/components/responses/Unauthorized"}, "403": {"$ref": "#/components/responses/Forbidden"}, "404": {"$ref": "#/components/responses/NotFound"}}}
+    },
+    "/api/v1/videos/{video_id}/danmaku": {
+      "parameters": [{"name": "video_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+      "post": {"operationId": "createDanmaku", "summary": "Create sanitized, rate-limited danmaku", "tags": ["Social"], "security": [{"BearerAuth": []}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CreateDanmakuRequest"}}}}, "responses": {"201": {"description": "Danmaku created.", "content": {"application/json": {"schema": {"type": "object", "required": ["danmaku"], "properties": {"danmaku": {"$ref": "#/components/schemas/Danmaku"}}}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}, "429": {"$ref": "#/components/responses/TooManyRequests"}}},
+      "get": {"operationId": "listDanmaku", "summary": "List danmaku in a playback time window", "tags": ["Social"], "parameters": [{"name": "start_ms", "in": "query", "schema": {"type": "integer", "minimum": 0, "default": 0}}, {"name": "end_ms", "in": "query", "schema": {"type": "integer", "minimum": 0}}, {"$ref": "#/components/parameters/Cursor"}, {"$ref": "#/components/parameters/Limit"}], "responses": {"200": {"description": "Danmaku page.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DanmakuPage"}}}}}}
+    },
+    "/api/v1/feed/following": {
+      "get": {"operationId": "getFollowingFeed", "summary": "Get the stable following feed", "tags": ["Discovery"], "security": [{"BearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/Cursor"}, {"$ref": "#/components/parameters/Limit"}], "responses": {"200": {"description": "Visibility-filtered feed.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FeedPage"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}}
+    },
+    "/api/v1/feed/hot": {
+      "get": {"operationId": "getHotFeed", "summary": "Get the decayed hot-score feed", "tags": ["Discovery"], "security": [{}, {"BearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/Limit"}], "responses": {"200": {"description": "Visibility-filtered feed; degraded signals Redis fallback.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FeedPage"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}}
+    },
+    "/api/v1/feed/recommendations": {
+      "get": {"operationId": "getRecommendations", "summary": "Get explainable personalized recommendations", "tags": ["Discovery"], "security": [{"BearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/Limit"}], "responses": {"200": {"description": "Visibility-filtered recommendations with reason codes.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FeedPage"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}}
+    },
+    "/api/v1/admin/dead-letters/{dead_letter_id}/replay": {
+      "parameters": [{"name": "dead_letter_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+      "post": {
+        "operationId": "replayDeadLetter",
+        "summary": "Replay a quarantined event with its stable event ID",
+        "tags": ["Operations"],
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {"description": "Broker acknowledged the replay."},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "getMetrics",
+        "summary": "Get Prometheus metrics",
+        "tags": ["Operations"],
+        "responses": {
+          "200": {
+            "description": "Prometheus text exposition.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "Cursor": {"name": "cursor", "in": "query", "description": "Opaque continuation token returned by the previous page.", "schema": {"type": "string", "maxLength": 1024}},
+      "Limit": {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}}
+    },
+    "headers": {
+      "RequestID": {
+        "description": "Request correlation identifier. A valid client value is preserved; otherwise the server generates one.",
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "The request is syntactically valid HTTP but fails API validation.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Authentication credentials are missing or invalid.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "The caller is authenticated but not authorized for the resource.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "The resource does not exist or is not visible to the caller.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "The request conflicts with current resource state or uniqueness constraints.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "The caller exceeded a rate limit.",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds until the caller can retry.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "A required dependency prevents the service from satisfying its contract.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": {
+                "code": "service_unavailable",
+                "message": "service is not ready"
+              },
+              "request_id": "ea6a7cc2076c4bb1b26e7fa4603fa899"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["ok", "ready"]
+          }
+        }
+      },
+      "APIError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "examples": ["not_found"]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error", "request_id"],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/APIError"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "CursorPageMeta": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["next_cursor", "has_more"],
+        "properties": {
+          "next_cursor": {
+            "type": ["string", "null"],
+            "description": "Opaque continuation token. Clients must not parse or construct it.",
+            "maxLength": 1024
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["username", "email", "password"],
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_]{3,32}$"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128,
+            "writeOnly": true
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["identity", "password"],
+        "properties": {
+          "identity": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 254
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "writeOnly": true
+          }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["refresh_token"],
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 512,
+            "writeOnly": true
+          }
+        }
+      },
+      "TokenPair": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["access_token", "refresh_token", "token_type", "expires_in"],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "refresh_token": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "token_type": {
+            "type": "string",
+            "const": "Bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "username", "email", "role", "created_at"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["member", "moderator", "admin"]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["user"],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "CreateVideoRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title"],
+        "properties": {"title": {"type": "string", "minLength": 1, "maxLength": 120}, "description": {"type": "string", "maxLength": 5000}}
+      },
+      "Video": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "creator_id", "title", "description", "state", "version", "created_at", "updated_at"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"}, "creator_id": {"type": "string", "format": "uuid"},
+          "title": {"type": "string"}, "description": {"type": "string"},
+          "state": {"type": "string", "enum": ["draft", "uploaded", "processing", "review", "published", "failed", "withdrawn"]},
+          "version": {"type": "integer", "minimum": 0}, "published_at": {"type": ["string", "null"], "format": "date-time"},
+          "created_at": {"type": "string", "format": "date-time"}, "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "UploadRequest": {
+        "type": "object", "additionalProperties": false, "required": ["size_bytes", "content_type", "checksum_sha256"],
+        "properties": {"size_bytes": {"type": "integer", "minimum": 1}, "content_type": {"type": "string", "const": "video/mp4"}, "checksum_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}}
+      },
+      "UploadGrant": {
+        "type": "object", "additionalProperties": false, "required": ["asset_id", "upload_url", "expires_at"],
+        "properties": {"asset_id": {"type": "string", "format": "uuid"}, "upload_url": {"type": "string", "format": "uri"}, "expires_at": {"type": "string", "format": "date-time"}}
+      },
+      "FinalizeResult": {
+        "type": "object", "additionalProperties": false, "required": ["asset_id", "job_id", "video"],
+        "properties": {"asset_id": {"type": "string", "format": "uuid"}, "job_id": {"type": "string", "format": "uuid"}, "video": {"$ref": "#/components/schemas/Video"}}
+      },
+      "ReviewVideoRequest": {
+        "type": "object", "additionalProperties": false, "required": ["expected_version", "approved", "reason"],
+        "properties": {"expected_version": {"type": "integer", "minimum": 0}, "approved": {"type": "boolean"}, "reason": {"type": "string", "minLength": 1, "maxLength": 1000}}
+      },
+      "WithdrawVideoRequest": {
+        "type": "object", "additionalProperties": false, "required": ["expected_version", "reason"],
+        "properties": {"expected_version": {"type": "integer", "minimum": 0}, "reason": {"type": "string", "minLength": 1, "maxLength": 1000}}
+      },
+      "RelationResult": {
+        "type": "object", "additionalProperties": false, "required": ["changed", "exists"],
+        "properties": {"changed": {"type": "boolean"}, "exists": {"type": "boolean"}, "version": {"type": "integer", "minimum": 1}}
+      },
+      "CreateCommentRequest": {
+        "type": "object", "additionalProperties": false, "required": ["body"],
+        "properties": {"parent_id": {"type": "string", "format": "uuid"}, "body": {"type": "string", "minLength": 1, "maxLength": 1000}}
+      },
+      "Comment": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "video_id", "author_id", "body", "deleted", "created_at"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"}, "video_id": {"type": "string", "format": "uuid"},
+          "author_id": {"type": "string", "format": "uuid"}, "parent_id": {"type": "string", "format": "uuid"},
+          "body": {"type": "string"}, "deleted": {"type": "boolean"}, "created_at": {"type": "string", "format": "date-time"},
+          "replies": {"type": "array", "items": {"$ref": "#/components/schemas/Comment"}}
+        }
+      },
+      "CommentPage": {
+        "type": "object", "additionalProperties": false, "required": ["items", "has_more"],
+        "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/Comment"}}, "next_cursor": {"type": "string"}, "has_more": {"type": "boolean"}}
+      },
+      "CreateDanmakuRequest": {
+        "type": "object", "additionalProperties": false, "required": ["position_ms", "body"],
+        "properties": {"position_ms": {"type": "integer", "minimum": 0, "maximum": 43200000}, "body": {"type": "string", "minLength": 1, "maxLength": 200}}
+      },
+      "Danmaku": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "video_id", "author_id", "position_ms", "body", "created_at"],
+        "properties": {"id": {"type": "string", "format": "uuid"}, "video_id": {"type": "string", "format": "uuid"}, "author_id": {"type": "string", "format": "uuid"}, "position_ms": {"type": "integer", "minimum": 0}, "body": {"type": "string"}, "created_at": {"type": "string", "format": "date-time"}}
+      },
+      "DanmakuPage": {
+        "type": "object", "additionalProperties": false, "required": ["items", "has_more"],
+        "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/Danmaku"}}, "next_cursor": {"type": "string"}, "has_more": {"type": "boolean"}}
+      },
+      "FeedItem": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "creator_id", "title", "description", "category", "published_at"],
+        "properties": {"id": {"type": "string", "format": "uuid"}, "creator_id": {"type": "string", "format": "uuid"}, "title": {"type": "string"}, "description": {"type": "string"}, "category": {"type": "string"}, "published_at": {"type": "string", "format": "date-time"}, "reason_code": {"type": "string"}}
+      },
+      "FeedPage": {
+        "type": "object", "additionalProperties": false, "required": ["items", "has_more"],
+        "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/FeedItem"}}, "next_cursor": {"type": "string"}, "has_more": {"type": "boolean"}, "degraded": {"type": "boolean"}}
+      },
+      "PublicVideo": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "creator_id", "title", "description", "published_at", "playback_url", "cover_url", "url_expires_at"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"}, "creator_id": {"type": "string", "format": "uuid"},
+          "title": {"type": "string"}, "description": {"type": "string"}, "published_at": {"type": "string", "format": "date-time"},
+          "playback_url": {"type": "string", "format": "uri"}, "cover_url": {"type": "string", "format": "uri"},
+          "url_expires_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

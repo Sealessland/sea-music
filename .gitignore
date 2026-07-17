@@ -12,9 +12,8 @@
 .giter-agent.toml
 .giter-terminal.log
 
-# Generated runtime evidence
+# Generated runtime evidence (regenerable via make benchmark / make loadtest)
 artifacts/benchmarks/
-artifacts/performance/
 
 # Build outputs
 bin/

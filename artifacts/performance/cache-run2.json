@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-07-13T05:15:08.362424557Z",
+  "base_url": "http://127.0.0.1:38084",
+  "concurrency": 16,
+  "scenarios": [
+    {
+      "name": "video-detail-read",
+      "requests": 500,
+      "errors": 0,
+      "throughput_rps": 1631.3138923457789,
+      "p50_ms": 5.597,
+      "p95_ms": 41.221,
+      "p99_ms": 76.596,
+      "elapsed_ms": 306
+    },
+    {
+      "name": "burst-like-toggle",
+      "requests": 500,
+      "errors": 0,
+      "throughput_rps": 1242.8750726084509,
+      "p50_ms": 10.809,
+      "p95_ms": 29.056,
+      "p99_ms": 39.979,
+      "elapsed_ms": 402
+    }
+  ],
+  "backlog_recovery_ms": 1039
+}

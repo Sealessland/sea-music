@@ -98,7 +98,7 @@ flowchart LR
 
 ## 性能与压测
 
-所有数字都可用仓库脚本重放（原始归档写入本地 `artifacts/`，按 .gitignore 约定不入库）；口径与边界在 [docs/performance/baseline.md](docs/performance/baseline.md) 中有诚实声明（单机微基准，不外推为生产容量）。
+所有数字都可用仓库脚本重放，基线原始证据已入库（`artifacts/performance/`）；口径与边界在 [docs/performance/baseline.md](docs/performance/baseline.md) 中有诚实声明（单机微基准，不外推为生产容量）。
 
 - 固定 seed `20260713` 数据集：1,000 用户、500 视频、5,000 关注、4,000 点赞、1,500 收藏、1,000 评论、1,500 弹幕。
 - **签名 URL 缓存 A/B**（closed-model，三次中位数）：视频详情吞吐 2998 → 3645 RPS（+21.6%），p99 降低 12.0%，3,000 个 A/B 请求 0 错误。
@@ -185,7 +185,7 @@ api/openapi.json          # OpenAPI 契约
 deploy/observability/     # Collector/Prometheus/Grafana/Tempo 配置与预置仪表盘
 benchmarks/k6/            # k6 压测脚本
 scripts/                  # bootstrap/verify/fault-drill/benchmark 等可重放脚本
-artifacts/                # 压测/演练原始证据（脚本本地生成，按 .gitignore 约定不入库）
+artifacts/performance/    # 性能基线原始证据（已入库）；benchmarks/ 大体积归档本地生成不入库
 docs/                     # 架构、ADR、评审、性能、runbook、验证报告
 openspec/                 # 本仓库采用 spec-driven 开发的过程材料
 ```

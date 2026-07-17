@@ -1,0 +1,115 @@
+sea_music_http_requests_total{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx"} 250
+sea_music_http_errors_total{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx"} 0
+sea_music_http_request_duration_seconds_sum{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx"} 1.393751
+sea_music_http_request_duration_seconds_bucket{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx",le="0.005"} 124
+sea_music_http_request_duration_seconds_bucket{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx",le="0.01"} 185
+sea_music_http_request_duration_seconds_bucket{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx",le="0.025"} 250
+sea_music_http_request_duration_seconds_bucket{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx",le="0.05"} 250
+sea_music_http_request_duration_seconds_bucket{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx",le="0.1"} 250
+sea_music_http_request_duration_seconds_bucket{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx",le="0.25"} 250
+sea_music_http_request_duration_seconds_bucket{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx",le="0.5"} 250
+sea_music_http_request_duration_seconds_bucket{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx",le="1"} 250
+sea_music_http_request_duration_seconds_bucket{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx",le="2.5"} 250
+sea_music_http_request_duration_seconds_bucket{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx",le="5"} 250
+sea_music_http_request_duration_seconds_bucket{method="DELETE",route="DELETE /api/v1/videos/{video_id}/like",status_class="2xx",le="+Inf"} 250
+sea_music_http_requests_total{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx"} 500
+sea_music_http_errors_total{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx"} 0
+sea_music_http_request_duration_seconds_sum{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx"} 1.508407
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx",le="0.005"} 468
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx",le="0.01"} 470
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx",le="0.025"} 485
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx",le="0.05"} 500
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx",le="0.1"} 500
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx",le="0.25"} 500
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx",le="0.5"} 500
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx",le="1"} 500
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx",le="2.5"} 500
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx",le="5"} 500
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /api/v1/videos/{video_id}",status_class="2xx",le="+Inf"} 500
+sea_music_http_requests_total{method="GET",route="GET /metrics",status_class="2xx"} 9
+sea_music_http_errors_total{method="GET",route="GET /metrics",status_class="2xx"} 0
+sea_music_http_request_duration_seconds_sum{method="GET",route="GET /metrics",status_class="2xx"} 0.010900
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /metrics",status_class="2xx",le="0.005"} 9
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /metrics",status_class="2xx",le="0.01"} 9
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /metrics",status_class="2xx",le="0.025"} 9
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /metrics",status_class="2xx",le="0.05"} 9
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /metrics",status_class="2xx",le="0.1"} 9
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /metrics",status_class="2xx",le="0.25"} 9
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /metrics",status_class="2xx",le="0.5"} 9
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /metrics",status_class="2xx",le="1"} 9
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /metrics",status_class="2xx",le="2.5"} 9
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /metrics",status_class="2xx",le="5"} 9
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /metrics",status_class="2xx",le="+Inf"} 9
+sea_music_http_requests_total{method="GET",route="GET /readyz",status_class="2xx"} 1
+sea_music_http_errors_total{method="GET",route="GET /readyz",status_class="2xx"} 0
+sea_music_http_request_duration_seconds_sum{method="GET",route="GET /readyz",status_class="2xx"} 0.001765
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /readyz",status_class="2xx",le="0.005"} 1
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /readyz",status_class="2xx",le="0.01"} 1
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /readyz",status_class="2xx",le="0.025"} 1
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /readyz",status_class="2xx",le="0.05"} 1
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /readyz",status_class="2xx",le="0.1"} 1
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /readyz",status_class="2xx",le="0.25"} 1
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /readyz",status_class="2xx",le="0.5"} 1
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /readyz",status_class="2xx",le="1"} 1
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /readyz",status_class="2xx",le="2.5"} 1
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /readyz",status_class="2xx",le="5"} 1
+sea_music_http_request_duration_seconds_bucket{method="GET",route="GET /readyz",status_class="2xx",le="+Inf"} 1
+sea_music_http_requests_total{method="POST",route="POST /api/v1/sessions",status_class="2xx"} 1
+sea_music_http_errors_total{method="POST",route="POST /api/v1/sessions",status_class="2xx"} 0
+sea_music_http_request_duration_seconds_sum{method="POST",route="POST /api/v1/sessions",status_class="2xx"} 0.171159
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/sessions",status_class="2xx",le="0.005"} 0
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/sessions",status_class="2xx",le="0.01"} 0
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/sessions",status_class="2xx",le="0.025"} 0
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/sessions",status_class="2xx",le="0.05"} 0
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/sessions",status_class="2xx",le="0.1"} 0
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/sessions",status_class="2xx",le="0.25"} 1
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/sessions",status_class="2xx",le="0.5"} 1
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/sessions",status_class="2xx",le="1"} 1
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/sessions",status_class="2xx",le="2.5"} 1
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/sessions",status_class="2xx",le="5"} 1
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/sessions",status_class="2xx",le="+Inf"} 1
+sea_music_http_requests_total{method="POST",route="POST /api/v1/users",status_class="2xx"} 1
+sea_music_http_errors_total{method="POST",route="POST /api/v1/users",status_class="2xx"} 0
+sea_music_http_request_duration_seconds_sum{method="POST",route="POST /api/v1/users",status_class="2xx"} 0.173181
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/users",status_class="2xx",le="0.005"} 0
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/users",status_class="2xx",le="0.01"} 0
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/users",status_class="2xx",le="0.025"} 0
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/users",status_class="2xx",le="0.05"} 0
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/users",status_class="2xx",le="0.1"} 0
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/users",status_class="2xx",le="0.25"} 1
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/users",status_class="2xx",le="0.5"} 1
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/users",status_class="2xx",le="1"} 1
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/users",status_class="2xx",le="2.5"} 1
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/users",status_class="2xx",le="5"} 1
+sea_music_http_request_duration_seconds_bucket{method="POST",route="POST /api/v1/users",status_class="2xx",le="+Inf"} 1
+sea_music_http_requests_total{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx"} 250
+sea_music_http_errors_total{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx"} 0
+sea_music_http_request_duration_seconds_sum{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx"} 2.985543
+sea_music_http_request_duration_seconds_bucket{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx",le="0.005"} 38
+sea_music_http_request_duration_seconds_bucket{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx",le="0.01"} 120
+sea_music_http_request_duration_seconds_bucket{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx",le="0.025"} 235
+sea_music_http_request_duration_seconds_bucket{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx",le="0.05"} 250
+sea_music_http_request_duration_seconds_bucket{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx",le="0.1"} 250
+sea_music_http_request_duration_seconds_bucket{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx",le="0.25"} 250
+sea_music_http_request_duration_seconds_bucket{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx",le="0.5"} 250
+sea_music_http_request_duration_seconds_bucket{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx",le="1"} 250
+sea_music_http_request_duration_seconds_bucket{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx",le="2.5"} 250
+sea_music_http_request_duration_seconds_bucket{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx",le="5"} 250
+sea_music_http_request_duration_seconds_bucket{method="PUT",route="PUT /api/v1/videos/{video_id}/like",status_class="2xx",le="+Inf"} 250
+sea_music_rate_limit_allowed_total{class="identity_write"} 2
+sea_music_rate_limit_rejected_total{class="identity_write"} 0
+sea_music_rate_limit_backend_errors_total{class="identity_write"} 0
+sea_music_outbox_events{state="pending"} 0
+sea_music_outbox_events{state="publishing"} 19
+sea_music_outbox_events{state="failed"} 0
+sea_music_outbox_oldest_seconds 0.612
+sea_music_counter_reconciliations_total 0
+sea_music_counter_drift_total 0
+sea_music_sql_connections{state="open"} 10
+sea_music_sql_connections{state="in_use"} 0
+sea_music_sql_connections{state="idle"} 10
+sea_music_redis_connections{state="total"} 1
+sea_music_redis_connections{state="idle"} 1
+sea_music_redis_pool_hits_total 3
+sea_music_redis_pool_misses_total 1
+sea_music_redis_pool_timeouts_total 0

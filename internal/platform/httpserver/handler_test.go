@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sealessland/sea-music/internal/platform/httpserver"
+	platformmetrics "github.com/sealessland/sea-music/internal/platform/metrics"
 )
 
 func TestLivenessDoesNotDependOnReadiness(t *testing.T) {
@@ -76,10 +77,14 @@ func TestHTTPMetricsUseBoundedRoutePatternNotResourceID(t *testing.T) {
 	for _, id := range []string{"resource-one", "resource-two"} {
 		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/things/"+id, nil))
 	}
-	var output strings.Builder
-	httpserver.WriteHTTPMetrics(&output)
-	if !strings.Contains(output.String(), `route="/things/:id"`) || strings.Contains(output.String(), "resource-one") || strings.Contains(output.String(), "resource-two") {
-		t.Fatalf("HTTP metric labels are unbounded: %s", output.String())
+	metricsResponse := httptest.NewRecorder()
+	platformmetrics.Handler().ServeHTTP(metricsResponse, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	metrics := metricsResponse.Body.String()
+	if !strings.Contains(metrics, `route="/things/:id"`) || strings.Contains(metrics, "resource-one") || strings.Contains(metrics, "resource-two") {
+		t.Fatalf("HTTP metric labels are unbounded: %s", metrics)
+	}
+	if !strings.Contains(metrics, "# HELP sea_music_http_requests_total") || !strings.Contains(metrics, "sea_music_http_request_duration_seconds_count") {
+		t.Fatalf("HTTP metrics are not emitted through a standards-compliant collector: %s", metrics)
 	}
 }
 
@@ -98,6 +103,15 @@ func TestCORSIsExactAllowlistAndSecurityHeadersAreAlwaysSet(t *testing.T) {
 	handler.ServeHTTP(blocked, blockedRequest)
 	if blocked.Header().Get("Access-Control-Allow-Origin") != "" || blocked.Header().Get("X-Content-Type-Options") != "nosniff" || blocked.Header().Get("X-Frame-Options") != "DENY" {
 		t.Fatalf("blocked origin or security headers = %v", blocked.Header())
+	}
+
+	blockedPreflightRequest := httptest.NewRequest(http.MethodOptions, "/api/v1/videos", nil)
+	blockedPreflightRequest.Header.Set("Origin", "https://evil.example.com")
+	blockedPreflightRequest.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	blockedPreflight := httptest.NewRecorder()
+	handler.ServeHTTP(blockedPreflight, blockedPreflightRequest)
+	if blockedPreflight.Code != http.StatusForbidden {
+		t.Fatalf("blocked preflight status = %d, want 403", blockedPreflight.Code)
 	}
 }
 

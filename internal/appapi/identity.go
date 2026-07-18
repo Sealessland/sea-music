@@ -1,9 +1,7 @@
 package appapi
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
 	"net/http"
 
@@ -27,15 +25,16 @@ func NewIdentityHandler(service *identity.Service, tokens *identity.TokenManager
 }
 
 func (h *IdentityHandler) RegisterRoutes(router gin.IRouter) {
-	router.POST("/api/v1/users", h.limits.GinWrap("identity_write", h.writePolicy, false), ginHandler(h.register))
-	router.POST("/api/v1/sessions", h.limits.GinWrap("identity_write", h.writePolicy, false), ginHandler(h.login))
-	router.POST("/api/v1/sessions/refresh", h.limits.GinWrap("identity_write", h.writePolicy, false), ginHandler(h.refresh))
-	router.GET("/api/v1/me", h.auth.RequireGin(), h.limits.GinWrap("identity_read", h.readPolicy, true), ginHandler(h.me))
+	router.POST("/api/v1/users", h.limits.GinWrap("identity_write", h.writePolicy, false), h.register)
+	router.POST("/api/v1/sessions", h.limits.GinWrap("identity_write", h.writePolicy, false), h.login)
+	router.POST("/api/v1/sessions/refresh", h.limits.GinWrap("identity_write", h.writePolicy, false), h.refresh)
+	router.GET("/api/v1/me", h.auth.Require(), h.limits.GinWrap("identity_read", h.readPolicy, true), h.me)
 }
 
-func (h *IdentityHandler) register(writer http.ResponseWriter, request *http.Request) {
+func (h *IdentityHandler) register(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	var input identity.RegisterInput
-	if err := decodeJSON(writer, request, &input); err != nil {
+	if err := bindJSON(context, &input); err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
@@ -53,7 +52,8 @@ func (h *IdentityHandler) register(writer http.ResponseWriter, request *http.Req
 	}
 }
 
-func (h *IdentityHandler) me(writer http.ResponseWriter, request *http.Request) {
+func (h *IdentityHandler) me(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	principal, ok := identity.PrincipalFromContext(request.Context())
 	if !ok {
 		httpx.WriteError(writer, request, http.StatusUnauthorized, "authentication_required", "valid bearer token required")
@@ -71,9 +71,10 @@ func (h *IdentityHandler) me(writer http.ResponseWriter, request *http.Request) 
 	}
 }
 
-func (h *IdentityHandler) login(writer http.ResponseWriter, request *http.Request) {
+func (h *IdentityHandler) login(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	var input identity.LoginInput
-	if err := decodeJSON(writer, request, &input); err != nil {
+	if err := bindJSON(context, &input); err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
@@ -89,11 +90,12 @@ func (h *IdentityHandler) login(writer http.ResponseWriter, request *http.Reques
 	}
 }
 
-func (h *IdentityHandler) refresh(writer http.ResponseWriter, request *http.Request) {
+func (h *IdentityHandler) refresh(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	var input struct {
 		RefreshToken string `json:"refresh_token"`
 	}
-	if err := decodeJSON(writer, request, &input); err != nil {
+	if err := bindJSON(context, &input); err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
@@ -107,29 +109,4 @@ func (h *IdentityHandler) refresh(writer http.ResponseWriter, request *http.Requ
 		h.logger.ErrorContext(request.Context(), "refresh failed", "request_id", httpx.RequestID(request.Context()), "error", err)
 		httpx.WriteError(writer, request, http.StatusInternalServerError, "internal_error", "internal server error")
 	}
-}
-
-func decodeJSON(writer http.ResponseWriter, request *http.Request, target any) error {
-	request.Body = http.MaxBytesReader(writer, request.Body, 1<<20)
-	decoder := json.NewDecoder(request.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		return errors.New("request body must be valid JSON")
-	}
-	if err := ensureJSONEnd(decoder); err != nil {
-		return errors.New("request body must contain one JSON object")
-	}
-	return nil
-}
-
-func ensureJSONEnd(decoder *json.Decoder) error {
-	var extra any
-	err := decoder.Decode(&extra)
-	if errors.Is(err, io.EOF) {
-		return nil
-	}
-	if err == nil {
-		return errors.New("extra JSON value")
-	}
-	return err
 }

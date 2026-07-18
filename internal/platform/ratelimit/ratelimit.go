@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -111,49 +111,41 @@ func asInt64(value any) (int64, error) {
 	}
 }
 
-type Counts struct {
-	Allowed       uint64
-	Rejected      uint64
-	BackendErrors uint64
-}
-
 type Metrics struct {
-	mu     sync.RWMutex
-	counts map[string]Counts
+	allowed       *prometheus.CounterVec
+	rejected      *prometheus.CounterVec
+	backendErrors *prometheus.CounterVec
 }
 
-func NewMetrics() *Metrics {
-	return &Metrics{counts: make(map[string]Counts)}
-}
-
-func (metrics *Metrics) Snapshot() map[string]Counts {
-	metrics.mu.RLock()
-	defer metrics.mu.RUnlock()
-	result := make(map[string]Counts, len(metrics.counts))
-	for class, counts := range metrics.counts {
-		result[class] = counts
+func NewMetrics(registerer prometheus.Registerer) *Metrics {
+	metrics := &Metrics{
+		allowed: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "sea_music_rate_limit_allowed_total",
+			Help: "Total number of requests admitted by the rate limiter.",
+		}, []string{"class"}),
+		rejected: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "sea_music_rate_limit_rejected_total",
+			Help: "Total number of requests rejected by the rate limiter.",
+		}, []string{"class"}),
+		backendErrors: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "sea_music_rate_limit_backend_errors_total",
+			Help: "Total number of rate limiter backend errors.",
+		}, []string{"class"}),
 	}
-	return result
+	registerer.MustRegister(metrics.allowed, metrics.rejected, metrics.backendErrors)
+	return metrics
 }
 
 func (metrics *Metrics) recordAllowed(class string) {
-	metrics.update(class, func(counts *Counts) { counts.Allowed++ })
+	metrics.allowed.WithLabelValues(class).Inc()
 }
 
 func (metrics *Metrics) recordRejected(class string) {
-	metrics.update(class, func(counts *Counts) { counts.Rejected++ })
+	metrics.rejected.WithLabelValues(class).Inc()
 }
 
 func (metrics *Metrics) recordBackendError(class string) {
-	metrics.update(class, func(counts *Counts) { counts.BackendErrors++ })
-}
-
-func (metrics *Metrics) update(class string, update func(*Counts)) {
-	metrics.mu.Lock()
-	defer metrics.mu.Unlock()
-	counts := metrics.counts[class]
-	update(&counts)
-	metrics.counts[class] = counts
+	metrics.backendErrors.WithLabelValues(class).Inc()
 }
 
 func RetryAfterSeconds(duration time.Duration) int {

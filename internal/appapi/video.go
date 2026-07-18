@@ -24,26 +24,27 @@ func NewVideoHandler(repository *video.PostgresRepository, uploads *video.Upload
 }
 
 func (handler *VideoHandler) RegisterRoutes(router gin.IRouter) {
-	router.POST("/api/v1/videos", handler.auth.RequireGin(), ginHandler(handler.createDraft))
-	router.POST("/api/v1/videos/:video_id/uploads", handler.auth.RequireGin(), ginHandler(handler.createUpload))
-	router.POST("/api/v1/videos/:video_id/finalize", handler.auth.RequireGin(), ginHandler(handler.finalizeUpload))
-	router.POST("/api/v1/videos/:video_id/review", handler.auth.RequireGin(), ginHandler(handler.reviewVideo))
-	router.POST("/api/v1/videos/:video_id/withdraw", handler.auth.RequireGin(), ginHandler(handler.withdrawVideo))
-	router.GET("/api/v1/videos/:video_id", ginHandler(handler.getPublicVideo))
+	router.POST("/api/v1/videos", handler.auth.Require(), handler.createDraft)
+	router.POST("/api/v1/videos/:video_id/uploads", handler.auth.Require(), handler.createUpload)
+	router.POST("/api/v1/videos/:video_id/finalize", handler.auth.Require(), handler.finalizeUpload)
+	router.POST("/api/v1/videos/:video_id/review", handler.auth.Require(), handler.reviewVideo)
+	router.POST("/api/v1/videos/:video_id/withdraw", handler.auth.Require(), handler.withdrawVideo)
+	router.GET("/api/v1/videos/:video_id", handler.getPublicVideo)
 }
 
-func (handler *VideoHandler) reviewVideo(writer http.ResponseWriter, request *http.Request) {
+func (handler *VideoHandler) reviewVideo(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
 	var input struct {
 		ExpectedVersion int64  `json:"expected_version"`
 		Approved        bool   `json:"approved"`
 		Reason          string `json:"reason"`
 	}
-	if err := decodeJSON(writer, request, &input); err != nil {
+	if err := bindJSON(context, &input); err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
-	result, err := handler.publication.Review(request.Context(), request.PathValue("video_id"), video.Actor{UserID: principal.UserID, Role: principal.Role}, input.ExpectedVersion, input.Approved, input.Reason)
+	result, err := handler.publication.Review(request.Context(), context.Param("video_id"), video.Actor{UserID: principal.UserID, Role: principal.Role}, input.ExpectedVersion, input.Approved, input.Reason)
 	if err != nil {
 		handler.writeError(writer, request, err)
 		return
@@ -51,17 +52,18 @@ func (handler *VideoHandler) reviewVideo(writer http.ResponseWriter, request *ht
 	httpx.WriteJSON(writer, http.StatusOK, map[string]any{"video": result})
 }
 
-func (handler *VideoHandler) withdrawVideo(writer http.ResponseWriter, request *http.Request) {
+func (handler *VideoHandler) withdrawVideo(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
 	var input struct {
 		ExpectedVersion int64  `json:"expected_version"`
 		Reason          string `json:"reason"`
 	}
-	if err := decodeJSON(writer, request, &input); err != nil {
+	if err := bindJSON(context, &input); err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
-	result, err := handler.publication.Withdraw(request.Context(), request.PathValue("video_id"), video.Actor{UserID: principal.UserID, Role: principal.Role}, input.ExpectedVersion, input.Reason)
+	result, err := handler.publication.Withdraw(request.Context(), context.Param("video_id"), video.Actor{UserID: principal.UserID, Role: principal.Role}, input.ExpectedVersion, input.Reason)
 	if err != nil {
 		handler.writeError(writer, request, err)
 		return
@@ -69,8 +71,9 @@ func (handler *VideoHandler) withdrawVideo(writer http.ResponseWriter, request *
 	httpx.WriteJSON(writer, http.StatusOK, map[string]any{"video": result})
 }
 
-func (handler *VideoHandler) getPublicVideo(writer http.ResponseWriter, request *http.Request) {
-	result, err := handler.publication.GetPublic(request.Context(), request.PathValue("video_id"))
+func (handler *VideoHandler) getPublicVideo(context *gin.Context) {
+	writer, request := context.Writer, context.Request
+	result, err := handler.publication.GetPublic(request.Context(), context.Param("video_id"))
 	if err != nil {
 		handler.writeError(writer, request, err)
 		return
@@ -78,13 +81,14 @@ func (handler *VideoHandler) getPublicVideo(writer http.ResponseWriter, request 
 	httpx.WriteJSON(writer, http.StatusOK, map[string]any{"video": result})
 }
 
-func (handler *VideoHandler) createDraft(writer http.ResponseWriter, request *http.Request) {
+func (handler *VideoHandler) createDraft(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
 	var input struct {
 		Title       string `json:"title"`
 		Description string `json:"description"`
 	}
-	if err := decodeJSON(writer, request, &input); err != nil {
+	if err := bindJSON(context, &input); err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
@@ -96,19 +100,20 @@ func (handler *VideoHandler) createDraft(writer http.ResponseWriter, request *ht
 	httpx.WriteJSON(writer, http.StatusCreated, map[string]any{"video": draft})
 }
 
-func (handler *VideoHandler) createUpload(writer http.ResponseWriter, request *http.Request) {
+func (handler *VideoHandler) createUpload(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
 	var input struct {
 		SizeBytes      int64  `json:"size_bytes"`
 		ContentType    string `json:"content_type"`
 		ChecksumSHA256 string `json:"checksum_sha256"`
 	}
-	if err := decodeJSON(writer, request, &input); err != nil {
+	if err := bindJSON(context, &input); err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 	grant, err := handler.uploads.CreateGrant(request.Context(), video.UploadRequest{
-		VideoID: request.PathValue("video_id"), CreatorID: principal.UserID, SizeBytes: input.SizeBytes,
+		VideoID: context.Param("video_id"), CreatorID: principal.UserID, SizeBytes: input.SizeBytes,
 		ContentType: input.ContentType, ChecksumSHA256: input.ChecksumSHA256,
 	})
 	if err != nil {
@@ -118,9 +123,10 @@ func (handler *VideoHandler) createUpload(writer http.ResponseWriter, request *h
 	httpx.WriteJSON(writer, http.StatusCreated, map[string]any{"upload": grant})
 }
 
-func (handler *VideoHandler) finalizeUpload(writer http.ResponseWriter, request *http.Request) {
+func (handler *VideoHandler) finalizeUpload(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
-	result, err := handler.uploads.Finalize(request.Context(), request.PathValue("video_id"), principal.UserID)
+	result, err := handler.uploads.Finalize(request.Context(), context.Param("video_id"), principal.UserID)
 	if err != nil {
 		handler.writeError(writer, request, err)
 		return

@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/sealessland/sea-music/internal/platform/httpx"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -27,7 +28,16 @@ func NewHandler(logger *slog.Logger, readiness ReadinessChecker, registrars ...R
 
 func NewHandlerWithOrigins(logger *slog.Logger, readiness ReadinessChecker, allowedOrigins []string, registrars ...RouteRegistrar) http.Handler {
 	router := gin.New()
-	router.Use(requestLog(logger), recoverPanic(logger), securityHeaders(allowedOrigins))
+	router.Use(requestLog(logger), recoverPanic(logger), securityHeaders())
+	if len(allowedOrigins) > 0 {
+		router.Use(cors.New(cors.Config{
+			AllowOrigins:     allowedOrigins,
+			AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
+			AllowHeaders:     []string{"Authorization", "Content-Type", "X-Request-ID"},
+			AllowCredentials: true,
+			MaxAge:           10 * time.Minute,
+		}))
+	}
 
 	router.GET("/livez", func(context *gin.Context) {
 		httpx.WriteJSON(context.Writer, http.StatusOK, map[string]string{"status": "ok"})
@@ -55,29 +65,11 @@ func NewHandlerWithOrigins(logger *slog.Logger, readiness ReadinessChecker, allo
 	return httpx.WithRequestID(otelhttp.NewHandler(router, "http.server"))
 }
 
-func securityHeaders(allowedOrigins []string) gin.HandlerFunc {
-	allowed := make(map[string]bool, len(allowedOrigins))
-	for _, origin := range allowedOrigins {
-		allowed[origin] = true
-	}
+func securityHeaders() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		context.Header("X-Content-Type-Options", "nosniff")
 		context.Header("X-Frame-Options", "DENY")
 		context.Header("Referrer-Policy", "no-referrer")
-		origin := context.GetHeader("Origin")
-		if allowed[origin] {
-			context.Header("Access-Control-Allow-Origin", origin)
-			context.Header("Access-Control-Allow-Credentials", "true")
-			context.Header("Vary", "Origin")
-			if context.Request.Method == http.MethodOptions {
-				context.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-				context.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID")
-				context.Header("Access-Control-Max-Age", "600")
-				context.Status(http.StatusNoContent)
-				context.Abort()
-				return
-			}
-		}
 		context.Next()
 	}
 }

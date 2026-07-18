@@ -11,19 +11,19 @@ import (
 var frontendFiles embed.FS
 
 func RegisterFrontendRoutes(router gin.IRouter) {
-	serveFrontendFile := func(path, contentType string) http.HandlerFunc {
-		return func(writer http.ResponseWriter, _ *http.Request) {
+	serveFrontendFile := func(path, contentType string) gin.HandlerFunc {
+		return func(context *gin.Context) {
 			data, err := frontendFiles.ReadFile(path)
 			if err != nil {
-				http.Error(writer, "frontend asset unavailable", http.StatusInternalServerError)
+				context.String(http.StatusInternalServerError, "frontend asset unavailable")
 				return
 			}
-			writer.Header().Set("Content-Type", contentType)
-			writer.Header().Set("Cache-Control", "no-cache")
-			_, _ = writer.Write(data)
+			context.Header("Content-Type", contentType)
+			context.Header("Cache-Control", "no-cache")
+			context.Data(http.StatusOK, contentType, data)
 		}
 	}
-	router.GET("/", ginHandler(serveFrontendFile("web/index.html", "text/html; charset=utf-8")))
-	router.GET("/assets/app.js", ginHandler(serveFrontendFile("web/app.js", "text/javascript; charset=utf-8")))
-	router.GET("/assets/styles.css", ginHandler(serveFrontendFile("web/styles.css", "text/css; charset=utf-8")))
+	router.GET("/", serveFrontendFile("web/index.html", "text/html; charset=utf-8"))
+	router.GET("/assets/app.js", serveFrontendFile("web/app.js", "text/javascript; charset=utf-8"))
+	router.GET("/assets/styles.css", serveFrontendFile("web/styles.css", "text/css; charset=utf-8"))
 }

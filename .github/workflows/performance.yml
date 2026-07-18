@@ -1,0 +1,164 @@
+name: Performance regression
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/performance.yml"
+      - "benchmarks/**"
+      - "cmd/**"
+      - "deploy/**"
+      - "internal/**"
+      - "migrations/**"
+      - "scripts/benchmark.sh"
+      - "scripts/check-benchmark.sh"
+      - "scripts/summarize-benchmark.jq"
+      - "scripts/update-benchmark-readme.sh"
+      - "compose.yaml"
+      - "go.mod"
+      - "go.sum"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/performance.yml"
+      - "benchmarks/**"
+      - "cmd/**"
+      - "deploy/**"
+      - "internal/**"
+      - "migrations/**"
+      - "scripts/**"
+      - "compose.yaml"
+      - "go.mod"
+      - "go.sum"
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      rate:
+        description: Offered requests per second
+        required: true
+        default: "200"
+      duration:
+        description: Duration of each measured run
+        required: true
+        default: "30s"
+      p95_limit_ms:
+        description: P95 latency gate in milliseconds
+        required: true
+        default: "250"
+      p99_limit_ms:
+        description: P99 latency gate in milliseconds
+        required: true
+        default: "500"
+
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      SEA_BENCH_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+      SEA_BENCH_RATE: ${{ inputs.rate || '200' }}
+      SEA_BENCH_DURATION: ${{ inputs.duration || '30s' }}
+      SEA_BENCH_REPEATS: "3"
+      SEA_BENCH_ACCESS_PATTERN: pareto80
+      SEA_BENCH_VIDEO_LIMIT: "200"
+      SEA_BENCH_DATASET_USERS: "200"
+      SEA_BENCH_DATASET_VIDEOS: "200"
+      SEA_BENCH_WARMUP_RATE: "50"
+      SEA_BENCH_WARMUP_DURATION: 10s
+      SEA_BENCH_PRE_ALLOCATED_VUS: "64"
+      SEA_BENCH_MAX_VUS: "256"
+      SEA_BENCH_P95_LIMIT_MS: ${{ inputs.p95_limit_ms || '250' }}
+      SEA_BENCH_P99_LIMIT_MS: ${{ inputs.p99_limit_ms || '500' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run every benchmark comparison
+        id: benchmark
+        continue-on-error: true
+        run: ./scripts/benchmark.sh
+
+      - name: Enforce k6 and service thresholds
+        id: benchmark_gate
+        if: always() && steps.benchmark.outcome == 'success'
+        continue-on-error: true
+        run: ./scripts/check-benchmark.sh "artifacts/benchmarks/$SEA_BENCH_RUN_ID"
+
+      - name: Publish benchmark summary
+        if: always() && hashFiles(format('artifacts/benchmarks/{0}/report.json', env.SEA_BENCH_RUN_ID)) != ''
+        run: |
+          report="artifacts/benchmarks/$SEA_BENCH_RUN_ID/report.json"
+          {
+            echo '## Performance regression'
+            echo
+            echo '| Variant | Runs | Actual QPS | P95 (ms) | P99 (ms) | Error rate | Dropped | Thresholds |'
+            echo '|---|---:|---:|---:|---:|---:|---:|---|'
+            jq -r '.variants | to_entries[] | "| `\(.key)` | \(.value.runs) | \(.value.request_rate_rps) | \(.value.latency_ms.p95) | \(.value.latency_ms.p99) | \(.value.failed_rate * 100)% | \(.value.dropped_iterations) | \(if .value.all_thresholds_passed then "pass" else "fail" end) |"' "$report"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Upload auditable benchmark archive
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: performance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/benchmarks/${{ env.SEA_BENCH_RUN_ID }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail unsuccessful benchmark
+        if: always()
+        run: |
+          test "${{ steps.benchmark.outcome }}" = success
+          test "${{ steps.benchmark_gate.outcome }}" = success
+
+  update-readme:
+    needs: benchmark
+    if: >-
+      needs.benchmark.result == 'success' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      SEA_BENCH_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Download validated benchmark archive
+        uses: actions/download-artifact@v8
+        with:
+          name: performance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/benchmarks/${{ env.SEA_BENCH_RUN_ID }}
+
+      - name: Update README metrics
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          ./scripts/update-benchmark-readme.sh \
+            "artifacts/benchmarks/$SEA_BENCH_RUN_ID/report.json" \
+            README.md "$RUN_URL" "$GITHUB_SHA"
+          if git diff --quiet -- README.md; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add README.md
+          git commit -m "docs: update benchmark metrics [skip ci]"
+          git push

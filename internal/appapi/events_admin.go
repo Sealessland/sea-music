@@ -22,13 +22,14 @@ func NewEventsAdminHandler(replay *events.ReplayService, auth *Authenticator, lo
 }
 
 func (handler *EventsAdminHandler) RegisterRoutes(router gin.IRouter) {
-	router.POST("/api/v1/admin/dead-letters/:dead_letter_id/replay", handler.auth.RequireGin(), ginHandler(handler.replayDeadLetter))
-	router.POST("/api/v1/admin/outbox-events/:event_id/replay", handler.auth.RequireGin(), ginHandler(handler.replayOutboxEvent))
+	router.POST("/api/v1/admin/dead-letters/:dead_letter_id/replay", handler.auth.Require(), handler.replayDeadLetter)
+	router.POST("/api/v1/admin/outbox-events/:event_id/replay", handler.auth.Require(), handler.replayOutboxEvent)
 }
 
-func (handler *EventsAdminHandler) replayDeadLetter(writer http.ResponseWriter, request *http.Request) {
+func (handler *EventsAdminHandler) replayDeadLetter(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
-	err := handler.replay.Replay(request.Context(), request.PathValue("dead_letter_id"), principal.Role)
+	err := handler.replay.Replay(request.Context(), context.Param("dead_letter_id"), principal.Role)
 	switch {
 	case err == nil:
 		httpx.WriteJSON(writer, http.StatusOK, map[string]string{"status": "replayed"})
@@ -42,9 +43,10 @@ func (handler *EventsAdminHandler) replayDeadLetter(writer http.ResponseWriter, 
 	}
 }
 
-func (handler *EventsAdminHandler) replayOutboxEvent(writer http.ResponseWriter, request *http.Request) {
+func (handler *EventsAdminHandler) replayOutboxEvent(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
-	err := handler.replay.ReplayOutboxEvent(request.Context(), request.PathValue("event_id"), principal.Role)
+	err := handler.replay.ReplayOutboxEvent(request.Context(), context.Param("event_id"), principal.Role)
 	switch {
 	case err == nil:
 		httpx.WriteJSON(writer, http.StatusOK, map[string]string{"status": "replayed"})

@@ -18,53 +18,11 @@ func NewAuthenticator(tokens *identity.TokenManager) *Authenticator {
 	return &Authenticator{tokens: tokens}
 }
 
-func (auth *Authenticator) Require(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		authorization := request.Header.Get("Authorization")
-		parts := strings.Split(authorization, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" || parts[1] == "" {
-			httpx.WriteError(writer, request, http.StatusUnauthorized, "authentication_required", "valid bearer token required")
-			return
-		}
-		claims, err := auth.tokens.Verify(parts[1], time.Now())
-		if err != nil {
-			httpx.WriteError(writer, request, http.StatusUnauthorized, "invalid_access_token", "access token is invalid")
-			return
-		}
-		principal := identity.Principal{UserID: claims.Subject, Role: claims.Role, SessionID: claims.SessionID}
-		next.ServeHTTP(writer, request.WithContext(identity.WithPrincipal(request.Context(), principal)))
-	})
-}
-
-func (auth *Authenticator) Optional(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		authorization := request.Header.Get("Authorization")
-		if authorization == "" {
-			next.ServeHTTP(writer, request)
-			return
-		}
-		parts := strings.Split(authorization, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" || parts[1] == "" {
-			httpx.WriteError(writer, request, http.StatusUnauthorized, "invalid_access_token", "access token is invalid")
-			return
-		}
-		claims, err := auth.tokens.Verify(parts[1], time.Now())
-		if err != nil {
-			httpx.WriteError(writer, request, http.StatusUnauthorized, "invalid_access_token", "access token is invalid")
-			return
-		}
-		principal := identity.Principal{UserID: claims.Subject, Role: claims.Role, SessionID: claims.SessionID}
-		next.ServeHTTP(writer, request.WithContext(identity.WithPrincipal(request.Context(), principal)))
-	})
-}
-
-// RequireGin is the Gin middleware used by the API router. The HTTP adapter
-// methods above remain for compatibility with focused handler tests.
-func (auth *Authenticator) RequireGin() gin.HandlerFunc {
+func (auth *Authenticator) Require() gin.HandlerFunc {
 	return auth.ginAuthenticate(true)
 }
 
-func (auth *Authenticator) OptionalGin() gin.HandlerFunc {
+func (auth *Authenticator) Optional() gin.HandlerFunc {
 	return auth.ginAuthenticate(false)
 }
 

@@ -72,6 +72,39 @@ func TestDomainModulesDoNotImportEachOther(t *testing.T) {
 	}
 }
 
+func TestInnerLayersDoNotImportHTTPAdapter(t *testing.T) {
+	root := repositoryRoot(t)
+	fset := token.NewFileSet()
+	for _, owner := range domainModules {
+		owner := owner
+		err := filepath.WalkDir(filepath.Join(root, "internal", owner), func(path string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			file, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
+			if err != nil {
+				return err
+			}
+			for _, spec := range file.Imports {
+				importPath, err := strconv.Unquote(spec.Path.Value)
+				if err != nil {
+					return err
+				}
+				if importPath == modulePath+"/internal/appapi" {
+					t.Errorf("%s: inner package %q must not import the HTTP adapter", fset.Position(spec.Pos()), owner)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("inspect inner package %q: %v", owner, err)
+		}
+	}
+}
+
 func assertAllowedDomainImport(t *testing.T, fset *token.FileSet, owner, importPath string, spec *ast.ImportSpec) {
 	t.Helper()
 	internalPrefix := modulePath + "/internal/"

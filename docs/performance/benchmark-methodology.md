@@ -64,6 +64,24 @@ the measured path.
 - `report.json`: median aggregation across repetitions and cache comparison.
 - `SHA256SUMS`: integrity hashes for inputs and raw results.
 
+## CI regression profile
+
+The `Performance regression` GitHub Actions workflow starts the repository's
+real PostgreSQL, Redis, Kafka, SeaweedFS, API, and Worker path, then runs every
+checked-in comparison variant. It currently measures both cache-disabled and
+cache-enabled variants three times, alternating their order, and reports the
+median QPS, P95, P99, error rate, dropped iterations, and threshold result.
+
+The workflow uploads the complete benchmark archive even when a k6 or service
+threshold fails, then fails the job. A successful run on `main` updates the
+generated metrics block in README; pull requests only publish the same table to
+the Actions job summary and cannot rewrite their branch.
+
+The CI profile offers 200 requests/second for 30 seconds per measured run, with
+a 10-second warm-up. These deliberately stable shared-runner settings are a
+regression gate, not a capacity or SLA claim. The heavier `make benchmark`
+defaults remain the authoritative local/dedicated-host profile.
+
 ## Interpretation boundary
 
 This local profile is suitable for regression evidence and for explaining an

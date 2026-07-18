@@ -22,32 +22,35 @@ func NewDiscoveryHandler(repository *discovery.PostgresRepository, auth *Authent
 }
 
 func (handler *DiscoveryHandler) RegisterRoutes(router gin.IRouter) {
-	router.GET("/api/v1/feed/following", handler.auth.RequireGin(), ginHandler(handler.following))
-	router.GET("/api/v1/feed/hot", handler.auth.OptionalGin(), ginHandler(handler.hot))
-	router.GET("/api/v1/feed/recommendations", handler.auth.RequireGin(), ginHandler(handler.recommendations))
+	router.GET("/api/v1/feed/following", handler.auth.Require(), handler.following)
+	router.GET("/api/v1/feed/hot", handler.auth.Optional(), handler.hot)
+	router.GET("/api/v1/feed/recommendations", handler.auth.Require(), handler.recommendations)
 }
 
-func (handler *DiscoveryHandler) following(writer http.ResponseWriter, request *http.Request) {
+func (handler *DiscoveryHandler) following(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
-	page, err := handler.repository.Following(request.Context(), principal.UserID, request.URL.Query().Get("cursor"), parseQueryInt(request, "limit", 20))
+	page, err := handler.repository.Following(request.Context(), principal.UserID, context.Query("cursor"), parseQueryInt(context, "limit", 20))
 	handler.writeFeed(writer, request, page, err)
 }
 
-func (handler *DiscoveryHandler) hot(writer http.ResponseWriter, request *http.Request) {
+func (handler *DiscoveryHandler) hot(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	principal, authenticated := identity.PrincipalFromContext(request.Context())
 	var page discovery.FeedPage
 	var err error
 	if authenticated {
-		page, err = handler.repository.HotFor(request.Context(), principal.UserID, parseQueryInt(request, "limit", 20))
+		page, err = handler.repository.HotFor(request.Context(), principal.UserID, parseQueryInt(context, "limit", 20))
 	} else {
-		page, err = handler.repository.Hot(request.Context(), parseQueryInt(request, "limit", 20))
+		page, err = handler.repository.Hot(request.Context(), parseQueryInt(context, "limit", 20))
 	}
 	handler.writeFeed(writer, request, page, err)
 }
 
-func (handler *DiscoveryHandler) recommendations(writer http.ResponseWriter, request *http.Request) {
+func (handler *DiscoveryHandler) recommendations(context *gin.Context) {
+	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
-	page, err := handler.repository.Recommend(request.Context(), principal.UserID, parseQueryInt(request, "limit", 20))
+	page, err := handler.repository.Recommend(request.Context(), principal.UserID, parseQueryInt(context, "limit", 20))
 	handler.writeFeed(writer, request, page, err)
 }
 

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/sealessland/sea-music/internal/appapi"
 	"github.com/sealessland/sea-music/internal/identity"
 )
@@ -14,14 +15,15 @@ import (
 func TestOptionalAuthenticationAllowsAnonymousAndAttachesValidPrincipal(t *testing.T) {
 	tokens := identity.NewTokenManager([]byte(strings.Repeat("k", 32)), "test", time.Hour)
 	auth := appapi.NewAuthenticator(tokens)
-	handler := auth.Optional(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		principal, ok := identity.PrincipalFromContext(request.Context())
+	handler := gin.New()
+	handler.GET("/", auth.Optional(), func(context *gin.Context) {
+		principal, ok := identity.PrincipalFromContext(context.Request.Context())
 		if !ok {
-			writer.WriteHeader(http.StatusNoContent)
+			context.Status(http.StatusNoContent)
 			return
 		}
-		_, _ = writer.Write([]byte(principal.UserID))
-	}))
+		context.String(http.StatusOK, principal.UserID)
+	})
 
 	anonymous := httptest.NewRecorder()
 	handler.ServeHTTP(anonymous, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -44,9 +46,10 @@ func TestOptionalAuthenticationAllowsAnonymousAndAttachesValidPrincipal(t *testi
 
 func TestOptionalAuthenticationRejectsInvalidBearerToken(t *testing.T) {
 	auth := appapi.NewAuthenticator(identity.NewTokenManager([]byte(strings.Repeat("k", 32)), "test", time.Hour))
-	handler := auth.Optional(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+	handler := gin.New()
+	handler.GET("/", auth.Optional(), func(*gin.Context) {
 		t.Fatal("next handler called for invalid token")
-	}))
+	})
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
 	request.Header.Set("Authorization", "Bearer broken")
 	response := httptest.NewRecorder()

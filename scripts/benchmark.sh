@@ -234,8 +234,8 @@ done
 find "$RUN_DIR/runs" -name summary.json -type f -print0 \
     | sort -z \
     | xargs -0 jq -s -f scripts/summarize-benchmark.jq >"$RUN_DIR/report.json"
-sha256sum "$RUN_DIR"/environment.txt "$RUN_DIR"/targets.json \
-    "$RUN_DIR"/runs/*/summary.json "$RUN_DIR"/runs/*/raw.json.gz >"$RUN_DIR/SHA256SUMS"
+(cd "$RUN_DIR" && sha256sum environment.txt targets.json \
+    runs/*/summary.json runs/*/raw.json.gz >SHA256SUMS)
 ln -sfn "$RUN_ID" artifacts/benchmarks/latest
 
 cat "$RUN_DIR/report.json"

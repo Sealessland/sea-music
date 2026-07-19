@@ -51,6 +51,12 @@ func LoadFrom(lookup LookupEnv) (Config, error) {
 	if err := parsePositiveFloat(lookup, "SEA_RATE_IDENTITY_READ_RATE", &cfg.RateLimit.IdentityReadRate); err != nil {
 		return Config{}, err
 	}
+	if err := parsePositiveFloat(lookup, "SEA_MODERATION_APPROVE_THRESHOLD", &cfg.Moderation.ApproveThreshold); err != nil {
+		return Config{}, err
+	}
+	if err := parsePositiveFloat(lookup, "SEA_MODERATION_REJECT_THRESHOLD", &cfg.Moderation.RejectThreshold); err != nil {
+		return Config{}, err
+	}
 	if err := parsePositiveInt(lookup, "SEA_RATE_IDENTITY_READ_BURST", &cfg.RateLimit.IdentityReadBurst); err != nil {
 		return Config{}, err
 	}
@@ -145,6 +151,8 @@ func defaults(lookup LookupEnv) Config {
 			LeaseDuration:     2 * time.Minute,
 			EvaluationTimeout: 90 * time.Second,
 			RPCTimeout:        5 * time.Second,
+			ApproveThreshold:  0.90,
+			RejectThreshold:   0.95,
 		},
 	}
 }

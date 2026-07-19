@@ -45,6 +45,9 @@ func TestLoadUsesSafeOperationalDefaults(t *testing.T) {
 	if cfg.Moderation.Mode != "shadow" || cfg.Moderation.EvaluationTimeout >= cfg.Moderation.LeaseDuration {
 		t.Errorf("moderation safety defaults = %+v", cfg.Moderation)
 	}
+	if cfg.Moderation.ApproveThreshold != 0.90 || cfg.Moderation.RejectThreshold != 0.95 {
+		t.Errorf("moderation decision thresholds = %+v", cfg.Moderation)
+	}
 	if !cfg.Moderation.Insecure {
 		t.Fatal("development moderation transport should default to explicitly insecure local mode")
 	}
@@ -81,6 +84,29 @@ func TestLoadRequiresModerationProviderSecret(t *testing.T) {
 	}))
 	if err == nil || !strings.Contains(err.Error(), "SEA_MODERATION_PROVIDER_API_KEY") {
 		t.Fatalf("LoadFrom() error = %v", err)
+	}
+}
+
+func TestLoadValidatesModerationDecisionThresholds(t *testing.T) {
+	base := map[string]string{"SEA_AUTH_TOKEN_KEY": strings.Repeat("k", 32)}
+	tests := []struct {
+		name, key, value string
+	}{
+		{"approve over one", "SEA_MODERATION_APPROVE_THRESHOLD", "1.01"},
+		{"reject below approve", "SEA_MODERATION_REJECT_THRESHOLD", "0.80"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			values := make(map[string]string, len(base)+1)
+			for key, value := range base {
+				values[key] = value
+			}
+			values[test.key] = test.value
+			_, err := config.LoadFrom(mapLookup(values))
+			if err == nil || !strings.Contains(err.Error(), test.key) {
+				t.Fatalf("LoadFrom() error = %v, want %s error", err, test.key)
+			}
+		})
 	}
 }
 

@@ -69,16 +69,39 @@ type Finding struct {
 	TimestampMS int64   `json:"timestamp_ms,omitempty"`
 }
 
+// ReviewVote preserves one model role's evidence before deterministic policy
+// reconciliation. Votes are audit data, never publication authorization.
+type ReviewVote struct {
+	Stage        string    `json:"stage"`
+	Verdict      Verdict   `json:"verdict"`
+	Confidence   float64   `json:"confidence"`
+	Summary      string    `json:"summary"`
+	Findings     []Finding `json:"findings,omitempty"`
+	Provider     string    `json:"provider"`
+	Model        string    `json:"model"`
+	ModelVersion string    `json:"model_version,omitempty"`
+}
+
+// PolicyCheck records a deterministic guardrail evaluated after model calls.
+type PolicyCheck struct {
+	Code   string `json:"code"`
+	Passed bool   `json:"passed"`
+	Detail string `json:"detail"`
+}
+
 type Result struct {
-	Verdict       Verdict   `json:"verdict"`
-	Confidence    float64   `json:"confidence"`
-	Summary       string    `json:"summary"`
-	Findings      []Finding `json:"findings"`
-	Provider      string    `json:"provider"`
-	Model         string    `json:"model"`
-	ModelVersion  string    `json:"model_version,omitempty"`
-	PolicyVersion string    `json:"policy_version"`
-	CanPublish    bool      `json:"can_publish"`
+	Verdict       Verdict       `json:"verdict"`
+	Confidence    float64       `json:"confidence"`
+	Summary       string        `json:"summary"`
+	Findings      []Finding     `json:"findings"`
+	Provider      string        `json:"provider"`
+	Model         string        `json:"model"`
+	ModelVersion  string        `json:"model_version,omitempty"`
+	PolicyVersion string        `json:"policy_version"`
+	CanPublish    bool          `json:"can_publish"`
+	Strategy      string        `json:"strategy,omitempty"`
+	Votes         []ReviewVote  `json:"votes,omitempty"`
+	Checks        []PolicyCheck `json:"checks,omitempty"`
 }
 
 type Operation struct {
@@ -171,6 +194,27 @@ func (result Result) Validate() error {
 	}
 	for _, finding := range result.Findings {
 		if strings.TrimSpace(finding.Code) == "" || strings.TrimSpace(finding.Category) == "" || finding.Score < 0 || finding.Score > 1 || finding.TimestampMS < 0 {
+			return ErrInvalidResult
+		}
+	}
+	if len(result.Votes) > 8 || len(result.Checks) > 16 || (len(result.Votes) > 0 && strings.TrimSpace(result.Strategy) == "") {
+		return ErrInvalidResult
+	}
+	for _, vote := range result.Votes {
+		if strings.TrimSpace(vote.Stage) == "" || strings.TrimSpace(vote.Summary) == "" ||
+			strings.TrimSpace(vote.Provider) == "" || strings.TrimSpace(vote.Model) == "" ||
+			(vote.Verdict != VerdictApprove && vote.Verdict != VerdictReject && vote.Verdict != VerdictEscalate) ||
+			vote.Confidence < 0 || vote.Confidence > 1 {
+			return ErrInvalidResult
+		}
+		for _, finding := range vote.Findings {
+			if strings.TrimSpace(finding.Code) == "" || strings.TrimSpace(finding.Category) == "" || finding.Score < 0 || finding.Score > 1 || finding.TimestampMS < 0 {
+				return ErrInvalidResult
+			}
+		}
+	}
+	for _, check := range result.Checks {
+		if strings.TrimSpace(check.Code) == "" || strings.TrimSpace(check.Detail) == "" {
 			return ErrInvalidResult
 		}
 	}

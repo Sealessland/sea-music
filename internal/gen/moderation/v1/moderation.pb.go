@@ -558,6 +558,9 @@ type ReviewResult struct {
 	Model         string                 `protobuf:"bytes,6,opt,name=model,proto3" json:"model,omitempty"`
 	ModelVersion  string                 `protobuf:"bytes,7,opt,name=model_version,json=modelVersion,proto3" json:"model_version,omitempty"`
 	PolicyVersion string                 `protobuf:"bytes,8,opt,name=policy_version,json=policyVersion,proto3" json:"policy_version,omitempty"`
+	Strategy      string                 `protobuf:"bytes,9,opt,name=strategy,proto3" json:"strategy,omitempty"`
+	Votes         []*ReviewVote          `protobuf:"bytes,10,rep,name=votes,proto3" json:"votes,omitempty"`
+	Checks        []*PolicyCheck         `protobuf:"bytes,11,rep,name=checks,proto3" json:"checks,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -648,6 +651,187 @@ func (x *ReviewResult) GetPolicyVersion() string {
 	return ""
 }
 
+func (x *ReviewResult) GetStrategy() string {
+	if x != nil {
+		return x.Strategy
+	}
+	return ""
+}
+
+func (x *ReviewResult) GetVotes() []*ReviewVote {
+	if x != nil {
+		return x.Votes
+	}
+	return nil
+}
+
+func (x *ReviewResult) GetChecks() []*PolicyCheck {
+	if x != nil {
+		return x.Checks
+	}
+	return nil
+}
+
+type ReviewVote struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Stage         string                 `protobuf:"bytes,1,opt,name=stage,proto3" json:"stage,omitempty"`
+	Verdict       ReviewVerdict          `protobuf:"varint,2,opt,name=verdict,proto3,enum=sea_music.moderation.v1.ReviewVerdict" json:"verdict,omitempty"`
+	Confidence    float64                `protobuf:"fixed64,3,opt,name=confidence,proto3" json:"confidence,omitempty"`
+	Summary       string                 `protobuf:"bytes,4,opt,name=summary,proto3" json:"summary,omitempty"`
+	Findings      []*PolicyFinding       `protobuf:"bytes,5,rep,name=findings,proto3" json:"findings,omitempty"`
+	Provider      string                 `protobuf:"bytes,6,opt,name=provider,proto3" json:"provider,omitempty"`
+	Model         string                 `protobuf:"bytes,7,opt,name=model,proto3" json:"model,omitempty"`
+	ModelVersion  string                 `protobuf:"bytes,8,opt,name=model_version,json=modelVersion,proto3" json:"model_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewVote) Reset() {
+	*x = ReviewVote{}
+	mi := &file_sea_music_moderation_v1_moderation_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewVote) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewVote) ProtoMessage() {}
+
+func (x *ReviewVote) ProtoReflect() protoreflect.Message {
+	mi := &file_sea_music_moderation_v1_moderation_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewVote.ProtoReflect.Descriptor instead.
+func (*ReviewVote) Descriptor() ([]byte, []int) {
+	return file_sea_music_moderation_v1_moderation_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ReviewVote) GetStage() string {
+	if x != nil {
+		return x.Stage
+	}
+	return ""
+}
+
+func (x *ReviewVote) GetVerdict() ReviewVerdict {
+	if x != nil {
+		return x.Verdict
+	}
+	return ReviewVerdict_REVIEW_VERDICT_UNSPECIFIED
+}
+
+func (x *ReviewVote) GetConfidence() float64 {
+	if x != nil {
+		return x.Confidence
+	}
+	return 0
+}
+
+func (x *ReviewVote) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+func (x *ReviewVote) GetFindings() []*PolicyFinding {
+	if x != nil {
+		return x.Findings
+	}
+	return nil
+}
+
+func (x *ReviewVote) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *ReviewVote) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *ReviewVote) GetModelVersion() string {
+	if x != nil {
+		return x.ModelVersion
+	}
+	return ""
+}
+
+type PolicyCheck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Passed        bool                   `protobuf:"varint,2,opt,name=passed,proto3" json:"passed,omitempty"`
+	Detail        string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PolicyCheck) Reset() {
+	*x = PolicyCheck{}
+	mi := &file_sea_music_moderation_v1_moderation_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PolicyCheck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PolicyCheck) ProtoMessage() {}
+
+func (x *PolicyCheck) ProtoReflect() protoreflect.Message {
+	mi := &file_sea_music_moderation_v1_moderation_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PolicyCheck.ProtoReflect.Descriptor instead.
+func (*PolicyCheck) Descriptor() ([]byte, []int) {
+	return file_sea_music_moderation_v1_moderation_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *PolicyCheck) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *PolicyCheck) GetPassed() bool {
+	if x != nil {
+		return x.Passed
+	}
+	return false
+}
+
+func (x *PolicyCheck) GetDetail() string {
+	if x != nil {
+		return x.Detail
+	}
+	return ""
+}
+
 type ReviewOperation struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OperationId   string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
@@ -661,7 +845,7 @@ type ReviewOperation struct {
 
 func (x *ReviewOperation) Reset() {
 	*x = ReviewOperation{}
-	mi := &file_sea_music_moderation_v1_moderation_proto_msgTypes[7]
+	mi := &file_sea_music_moderation_v1_moderation_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -673,7 +857,7 @@ func (x *ReviewOperation) String() string {
 func (*ReviewOperation) ProtoMessage() {}
 
 func (x *ReviewOperation) ProtoReflect() protoreflect.Message {
-	mi := &file_sea_music_moderation_v1_moderation_proto_msgTypes[7]
+	mi := &file_sea_music_moderation_v1_moderation_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -686,7 +870,7 @@ func (x *ReviewOperation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReviewOperation.ProtoReflect.Descriptor instead.
 func (*ReviewOperation) Descriptor() ([]byte, []int) {
-	return file_sea_music_moderation_v1_moderation_proto_rawDescGZIP(), []int{7}
+	return file_sea_music_moderation_v1_moderation_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ReviewOperation) GetOperationId() string {
@@ -756,7 +940,7 @@ const file_sea_music_moderation_v1_moderation_proto_rawDesc = "" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x1a\n" +
 	"\bcategory\x18\x02 \x01(\tR\bcategory\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\x01R\x05score\x12!\n" +
-	"\ftimestamp_ms\x18\x04 \x01(\x03R\vtimestampMs\"\xcc\x02\n" +
+	"\ftimestamp_ms\x18\x04 \x01(\x03R\vtimestampMs\"\xe1\x03\n" +
 	"\fReviewResult\x12@\n" +
 	"\averdict\x18\x01 \x01(\x0e2&.sea_music.moderation.v1.ReviewVerdictR\averdict\x12\x1e\n" +
 	"\n" +
@@ -767,7 +951,27 @@ const file_sea_music_moderation_v1_moderation_proto_rawDesc = "" +
 	"\bprovider\x18\x05 \x01(\tR\bprovider\x12\x14\n" +
 	"\x05model\x18\x06 \x01(\tR\x05model\x12#\n" +
 	"\rmodel_version\x18\a \x01(\tR\fmodelVersion\x12%\n" +
-	"\x0epolicy_version\x18\b \x01(\tR\rpolicyVersion\"\xe7\x01\n" +
+	"\x0epolicy_version\x18\b \x01(\tR\rpolicyVersion\x12\x1a\n" +
+	"\bstrategy\x18\t \x01(\tR\bstrategy\x129\n" +
+	"\x05votes\x18\n" +
+	" \x03(\v2#.sea_music.moderation.v1.ReviewVoteR\x05votes\x12<\n" +
+	"\x06checks\x18\v \x03(\v2$.sea_music.moderation.v1.PolicyCheckR\x06checks\"\xb9\x02\n" +
+	"\n" +
+	"ReviewVote\x12\x14\n" +
+	"\x05stage\x18\x01 \x01(\tR\x05stage\x12@\n" +
+	"\averdict\x18\x02 \x01(\x0e2&.sea_music.moderation.v1.ReviewVerdictR\averdict\x12\x1e\n" +
+	"\n" +
+	"confidence\x18\x03 \x01(\x01R\n" +
+	"confidence\x12\x18\n" +
+	"\asummary\x18\x04 \x01(\tR\asummary\x12B\n" +
+	"\bfindings\x18\x05 \x03(\v2&.sea_music.moderation.v1.PolicyFindingR\bfindings\x12\x1a\n" +
+	"\bprovider\x18\x06 \x01(\tR\bprovider\x12\x14\n" +
+	"\x05model\x18\a \x01(\tR\x05model\x12#\n" +
+	"\rmodel_version\x18\b \x01(\tR\fmodelVersion\"Q\n" +
+	"\vPolicyCheck\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x16\n" +
+	"\x06passed\x18\x02 \x01(\bR\x06passed\x12\x16\n" +
+	"\x06detail\x18\x03 \x01(\tR\x06detail\"\xe7\x01\n" +
 	"\x0fReviewOperation\x12!\n" +
 	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12\x1d\n" +
 	"\n" +
@@ -808,7 +1012,7 @@ func file_sea_music_moderation_v1_moderation_proto_rawDescGZIP() []byte {
 }
 
 var file_sea_music_moderation_v1_moderation_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_sea_music_moderation_v1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_sea_music_moderation_v1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_sea_music_moderation_v1_moderation_proto_goTypes = []any{
 	(ModerationMode)(0),         // 0: sea_music.moderation.v1.ModerationMode
 	(ReviewStatus)(0),           // 1: sea_music.moderation.v1.ReviewStatus
@@ -820,26 +1024,32 @@ var file_sea_music_moderation_v1_moderation_proto_goTypes = []any{
 	(*GetReviewResponse)(nil),   // 7: sea_music.moderation.v1.GetReviewResponse
 	(*PolicyFinding)(nil),       // 8: sea_music.moderation.v1.PolicyFinding
 	(*ReviewResult)(nil),        // 9: sea_music.moderation.v1.ReviewResult
-	(*ReviewOperation)(nil),     // 10: sea_music.moderation.v1.ReviewOperation
+	(*ReviewVote)(nil),          // 10: sea_music.moderation.v1.ReviewVote
+	(*PolicyCheck)(nil),         // 11: sea_music.moderation.v1.PolicyCheck
+	(*ReviewOperation)(nil),     // 12: sea_music.moderation.v1.ReviewOperation
 }
 var file_sea_music_moderation_v1_moderation_proto_depIdxs = []int32{
 	0,  // 0: sea_music.moderation.v1.StartReviewRequest.mode:type_name -> sea_music.moderation.v1.ModerationMode
 	3,  // 1: sea_music.moderation.v1.StartReviewRequest.assets:type_name -> sea_music.moderation.v1.MediaAsset
-	10, // 2: sea_music.moderation.v1.StartReviewResponse.operation:type_name -> sea_music.moderation.v1.ReviewOperation
-	10, // 3: sea_music.moderation.v1.GetReviewResponse.operation:type_name -> sea_music.moderation.v1.ReviewOperation
+	12, // 2: sea_music.moderation.v1.StartReviewResponse.operation:type_name -> sea_music.moderation.v1.ReviewOperation
+	12, // 3: sea_music.moderation.v1.GetReviewResponse.operation:type_name -> sea_music.moderation.v1.ReviewOperation
 	2,  // 4: sea_music.moderation.v1.ReviewResult.verdict:type_name -> sea_music.moderation.v1.ReviewVerdict
 	8,  // 5: sea_music.moderation.v1.ReviewResult.findings:type_name -> sea_music.moderation.v1.PolicyFinding
-	1,  // 6: sea_music.moderation.v1.ReviewOperation.status:type_name -> sea_music.moderation.v1.ReviewStatus
-	9,  // 7: sea_music.moderation.v1.ReviewOperation.result:type_name -> sea_music.moderation.v1.ReviewResult
-	4,  // 8: sea_music.moderation.v1.ModerationService.StartReview:input_type -> sea_music.moderation.v1.StartReviewRequest
-	5,  // 9: sea_music.moderation.v1.ModerationService.GetReview:input_type -> sea_music.moderation.v1.GetReviewRequest
-	6,  // 10: sea_music.moderation.v1.ModerationService.StartReview:output_type -> sea_music.moderation.v1.StartReviewResponse
-	7,  // 11: sea_music.moderation.v1.ModerationService.GetReview:output_type -> sea_music.moderation.v1.GetReviewResponse
-	10, // [10:12] is the sub-list for method output_type
-	8,  // [8:10] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	10, // 6: sea_music.moderation.v1.ReviewResult.votes:type_name -> sea_music.moderation.v1.ReviewVote
+	11, // 7: sea_music.moderation.v1.ReviewResult.checks:type_name -> sea_music.moderation.v1.PolicyCheck
+	2,  // 8: sea_music.moderation.v1.ReviewVote.verdict:type_name -> sea_music.moderation.v1.ReviewVerdict
+	8,  // 9: sea_music.moderation.v1.ReviewVote.findings:type_name -> sea_music.moderation.v1.PolicyFinding
+	1,  // 10: sea_music.moderation.v1.ReviewOperation.status:type_name -> sea_music.moderation.v1.ReviewStatus
+	9,  // 11: sea_music.moderation.v1.ReviewOperation.result:type_name -> sea_music.moderation.v1.ReviewResult
+	4,  // 12: sea_music.moderation.v1.ModerationService.StartReview:input_type -> sea_music.moderation.v1.StartReviewRequest
+	5,  // 13: sea_music.moderation.v1.ModerationService.GetReview:input_type -> sea_music.moderation.v1.GetReviewRequest
+	6,  // 14: sea_music.moderation.v1.ModerationService.StartReview:output_type -> sea_music.moderation.v1.StartReviewResponse
+	7,  // 15: sea_music.moderation.v1.ModerationService.GetReview:output_type -> sea_music.moderation.v1.GetReviewResponse
+	14, // [14:16] is the sub-list for method output_type
+	12, // [12:14] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_sea_music_moderation_v1_moderation_proto_init() }
@@ -853,7 +1063,7 @@ func file_sea_music_moderation_v1_moderation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sea_music_moderation_v1_moderation_proto_rawDesc), len(file_sea_music_moderation_v1_moderation_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -1,0 +1,8 @@
+[
+  {"name":"unanimous_safe","reviewer_verdict":"approve","reviewer_confidence":0.97,"critic_verdict":"approve","critic_confidence":0.94,"want":"approve"},
+  {"name":"low_confidence_safe","reviewer_verdict":"approve","reviewer_confidence":0.89,"critic_verdict":"approve","critic_confidence":0.96,"want":"escalate"},
+  {"name":"unanimous_high_risk","reviewer_verdict":"reject","reviewer_confidence":0.99,"critic_verdict":"reject","critic_confidence":0.96,"want":"reject"},
+  {"name":"low_confidence_reject","reviewer_verdict":"reject","reviewer_confidence":0.94,"critic_verdict":"reject","critic_confidence":0.99,"want":"escalate"},
+  {"name":"reviewer_critic_disagreement","reviewer_verdict":"approve","reviewer_confidence":0.99,"critic_verdict":"reject","critic_confidence":0.99,"want":"escalate"},
+  {"name":"context_requires_human","reviewer_verdict":"escalate","reviewer_confidence":0.86,"critic_verdict":"escalate","critic_confidence":0.91,"want":"escalate"}
+]

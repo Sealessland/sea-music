@@ -77,6 +77,26 @@ message ReviewResult {
   string model = 6;
   string model_version = 7;
   string policy_version = 8;
+  string strategy = 9;
+  repeated ReviewVote votes = 10;
+  repeated PolicyCheck checks = 11;
+}
+
+message ReviewVote {
+  string stage = 1;
+  ReviewVerdict verdict = 2;
+  double confidence = 3;
+  string summary = 4;
+  repeated PolicyFinding findings = 5;
+  string provider = 6;
+  string model = 7;
+  string model_version = 8;
+}
+
+message PolicyCheck {
+  string code = 1;
+  bool passed = 2;
+  string detail = 3;
 }
 
 message ReviewOperation {

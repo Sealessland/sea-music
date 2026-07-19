@@ -74,16 +74,28 @@ func fromProtoOperation(value *moderationv1.ReviewOperation) (moderation.Operati
 	operation := moderation.Operation{ID: value.GetOperationId(), Status: fromProtoStatus(value.GetStatus()), Error: value.GetError()}
 	operation.Request.RequestID = value.GetRequestId()
 	if value.Result != nil {
-		findings := make([]moderation.Finding, 0, len(value.Result.Findings))
-		for _, finding := range value.Result.Findings {
-			if finding != nil {
-				findings = append(findings, moderation.Finding{Code: finding.Code, Category: finding.Category, Score: finding.Score, TimestampMS: finding.TimestampMs})
+		findings := fromProtoFindings(value.Result.Findings)
+		votes := make([]moderation.ReviewVote, 0, len(value.Result.Votes))
+		for _, vote := range value.Result.Votes {
+			if vote == nil {
+				continue
+			}
+			votes = append(votes, moderation.ReviewVote{
+				Stage: vote.Stage, Verdict: fromProtoVerdict(vote.Verdict), Confidence: vote.Confidence,
+				Summary: vote.Summary, Findings: fromProtoFindings(vote.Findings), Provider: vote.Provider, Model: vote.Model, ModelVersion: vote.ModelVersion,
+			})
+		}
+		checks := make([]moderation.PolicyCheck, 0, len(value.Result.Checks))
+		for _, check := range value.Result.Checks {
+			if check != nil {
+				checks = append(checks, moderation.PolicyCheck{Code: check.Code, Passed: check.Passed, Detail: check.Detail})
 			}
 		}
 		operation.Result = &moderation.Result{
 			Verdict: fromProtoVerdict(value.Result.Verdict), Confidence: value.Result.Confidence, Summary: value.Result.Summary,
 			Findings: findings, Provider: value.Result.Provider, Model: value.Result.Model,
 			ModelVersion: value.Result.ModelVersion, PolicyVersion: value.Result.PolicyVersion, CanPublish: false,
+			Strategy: value.Result.Strategy, Votes: votes, Checks: checks,
 		}
 		if err := operation.Result.Validate(); err != nil {
 			return moderation.Operation{}, fmt.Errorf("invalid moderation gRPC result: %w", err)
@@ -93,6 +105,16 @@ func fromProtoOperation(value *moderationv1.ReviewOperation) (moderation.Operati
 		return moderation.Operation{}, errors.New("invalid moderation gRPC response status")
 	}
 	return operation, nil
+}
+
+func fromProtoFindings(values []*moderationv1.PolicyFinding) []moderation.Finding {
+	findings := make([]moderation.Finding, 0, len(values))
+	for _, finding := range values {
+		if finding != nil {
+			findings = append(findings, moderation.Finding{Code: finding.Code, Category: finding.Category, Score: finding.Score, TimestampMS: finding.TimestampMs})
+		}
+	}
+	return findings
 }
 
 func fromProtoStatus(value moderationv1.ReviewStatus) moderation.Status {

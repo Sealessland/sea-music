@@ -126,6 +126,8 @@ type Moderation struct {
 	LeaseDuration     time.Duration
 	EvaluationTimeout time.Duration
 	RPCTimeout        time.Duration
+	ApproveThreshold  float64
+	RejectThreshold   float64
 }
 
 // Load reads process configuration from the environment.

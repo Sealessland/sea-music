@@ -20,7 +20,9 @@ flowchart LR
     Worker --> FF[ffprobe / ffmpeg]
     Worker -->|gRPC async operation| Agent[Moderation Agent]
     Agent --> PG
-    Agent --> Eino[Eino ChatModel]
+    Agent --> Reviewer[Eino Reviewer]
+    Agent --> Critic[Eino Critic]
+    Reviewer & Critic --> Policy[Deterministic Policy Gate]
     API & Worker & Agent --> OTel[OTel Collector]
     OTel --> Tempo[Tempo]
     OTel --> Prom[Prometheus]
@@ -34,7 +36,7 @@ flowchart LR
 3. Dispatcher 只有收到 Kafka ack 后才确认 Outbox；Worker 通过 Inbox 去重并领取带租约的处理任务。
 4. Worker 运行真实 ffprobe/ffmpeg，将视频推进审核态，并原子写入 `video.ready_for_moderation` Outbox。
 5. 专用 Kafka consumer 在 Inbox 事务内只创建 moderation dispatch job；网络调用在事务外由租约循环执行，通过 gRPC `StartReview/GetReview` 启动和回收长任务。
-6. Agent 的 operation 同样支持幂等、租约接管和有界重试。Eino provider 输出经过严格领域校验；缺少 provider、证据不足或输出异常都不会产生发布授权。
+6. Agent 的 operation 同样支持幂等、租约接管和有界重试。Eino reviewer 提交候选证据，独立 critic 负责反证；Go 策略门禁只接受一致且越过阈值的结论，分歧、低置信度、缺少 provider 或输出异常都不会产生发布授权。
 7. 点赞、收藏、关注、评论和弹幕先写权威关系及 Outbox，消费者异步投影计数和热门分数；周期对账修复漂移。
 8. 关注、热门、推荐三类 feed 在返回前统一执行发布状态、审核可见性和 block 关系过滤。
 

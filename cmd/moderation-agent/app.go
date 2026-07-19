@@ -120,6 +120,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	evaluator = moderation.InstrumentEvaluator(evaluator, moderation.NewAgentMetrics(registry))
 	runner := moderation.NewRunner(store, evaluator, workerID, cfg.Moderation.LeaseDuration, cfg.Moderation.EvaluationTimeout)
 	runnerContext, cancelRunner := context.WithCancel(ctx)
 	runnerStopped := make(chan struct{})
@@ -215,5 +216,12 @@ func newEvaluator(ctx context.Context, cfg config.Config) (moderation.Evaluator,
 	if err != nil {
 		return nil, err
 	}
-	return evaluator, nil
+	critic, err := moderation.NewEinoCritic(chatModel, cfg.Moderation.Provider, cfg.Moderation.ProviderModel)
+	if err != nil {
+		return nil, err
+	}
+	return moderation.NewAgentEvaluator(evaluator, critic, moderation.DecisionPolicy{
+		ApproveThreshold: cfg.Moderation.ApproveThreshold,
+		RejectThreshold:  cfg.Moderation.RejectThreshold,
+	})
 }

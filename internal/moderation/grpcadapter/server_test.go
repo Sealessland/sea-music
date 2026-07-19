@@ -86,7 +86,43 @@ func TestDomainClientRejectsInvalidRemoteEvidence(t *testing.T) {
 	}
 }
 
+func TestDomainClientPreservesAgentDecisionAuditTrail(t *testing.T) {
+	client := grpcadapter.NewClient(auditedEvidenceClient{}, time.Second)
+	operation, err := client.GetReview(context.Background(), "operation-1")
+	if err != nil {
+		t.Fatalf("GetReview() error = %v", err)
+	}
+	if operation.Result == nil || operation.Result.Strategy != "reviewer-critic-v1" || len(operation.Result.Votes) != 2 || len(operation.Result.Checks) != 1 {
+		t.Fatalf("result = %+v", operation.Result)
+	}
+	if operation.Result.Votes[1].Stage != "critic" || operation.Result.Checks[0].Passed {
+		t.Fatalf("audit trail = %+v", operation.Result)
+	}
+}
+
 type invalidEvidenceClient struct{}
+
+type auditedEvidenceClient struct{}
+
+func (auditedEvidenceClient) StartReview(context.Context, *moderationv1.StartReviewRequest, ...grpc.CallOption) (*moderationv1.StartReviewResponse, error) {
+	return nil, errors.New("not used")
+}
+
+func (auditedEvidenceClient) GetReview(context.Context, *moderationv1.GetReviewRequest, ...grpc.CallOption) (*moderationv1.GetReviewResponse, error) {
+	return &moderationv1.GetReviewResponse{Operation: &moderationv1.ReviewOperation{
+		OperationId: "operation-1", RequestId: "request-1", Status: moderationv1.ReviewStatus_REVIEW_STATUS_COMPLETED,
+		Result: &moderationv1.ReviewResult{
+			Verdict: moderationv1.ReviewVerdict_REVIEW_VERDICT_ESCALATE, Confidence: 0.91,
+			Summary: "reviewer/critic disagreement", Provider: "openai", Model: "test-model", PolicyVersion: "ugc-v1",
+			Strategy: "reviewer-critic-v1",
+			Votes: []*moderationv1.ReviewVote{
+				{Stage: "reviewer", Verdict: moderationv1.ReviewVerdict_REVIEW_VERDICT_APPROVE, Confidence: 0.99, Summary: "safe", Provider: "openai", Model: "test-model"},
+				{Stage: "critic", Verdict: moderationv1.ReviewVerdict_REVIEW_VERDICT_REJECT, Confidence: 0.91, Summary: "risk", Provider: "openai", Model: "test-model"},
+			},
+			Checks: []*moderationv1.PolicyCheck{{Code: "verdict_consensus", Passed: false, Detail: "reviewer=approve critic=reject"}},
+		},
+	}}, nil
+}
 
 func (invalidEvidenceClient) StartReview(context.Context, *moderationv1.StartReviewRequest, ...grpc.CallOption) (*moderationv1.StartReviewResponse, error) {
 	return nil, errors.New("not used")

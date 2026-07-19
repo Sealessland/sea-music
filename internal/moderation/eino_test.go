@@ -41,6 +41,29 @@ func TestEinoEvaluatorFailsClosedOnMalformedOutput(t *testing.T) {
 	}
 }
 
+func TestEinoCriticIndependentlyChallengesReviewerEvidence(t *testing.T) {
+	chat := &fakeChatModel{content: `{"verdict":"escalate","confidence":0.81,"summary":"quoted context is ambiguous","findings":[{"code":"context_ambiguous","category":"context","score":0.81}]}`}
+	critic, err := moderation.NewEinoCritic(chat, "openai", "test-model")
+	if err != nil {
+		t.Fatalf("NewEinoCritic(): %v", err)
+	}
+	reviewer := moderation.Result{
+		Verdict: moderation.VerdictReject, Confidence: 0.96, Summary: "possible hate",
+		Provider: "openai", Model: "test-model", PolicyVersion: "ugc-v1",
+	}
+	result, err := critic.Critique(context.Background(), validRequest(), reviewer)
+	if err != nil {
+		t.Fatalf("Critique(): %v", err)
+	}
+	if result.Verdict != moderation.VerdictEscalate {
+		t.Fatalf("result = %+v", result)
+	}
+	if len(chat.messages) != 2 || !strings.Contains(chat.messages[0].Content, "independent critic") ||
+		!strings.Contains(chat.messages[0].Content, "untrusted") || !strings.Contains(chat.messages[1].Content, reviewer.Summary) {
+		t.Fatalf("critic messages = %+v", chat.messages)
+	}
+}
+
 type fakeChatModel struct {
 	content  string
 	messages []*schema.Message

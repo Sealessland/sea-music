@@ -86,17 +86,37 @@ func toProtoOperation(operation moderation.Operation) *moderationv1.ReviewOperat
 	if operation.Result != nil {
 		findings := make([]*moderationv1.PolicyFinding, 0, len(operation.Result.Findings))
 		for _, finding := range operation.Result.Findings {
-			findings = append(findings, &moderationv1.PolicyFinding{
-				Code: finding.Code, Category: finding.Category, Score: finding.Score, TimestampMs: finding.TimestampMS,
+			findings = append(findings, toProtoFinding(finding))
+		}
+		votes := make([]*moderationv1.ReviewVote, 0, len(operation.Result.Votes))
+		for _, vote := range operation.Result.Votes {
+			voteFindings := make([]*moderationv1.PolicyFinding, 0, len(vote.Findings))
+			for _, finding := range vote.Findings {
+				voteFindings = append(voteFindings, toProtoFinding(finding))
+			}
+			votes = append(votes, &moderationv1.ReviewVote{
+				Stage: vote.Stage, Verdict: toProtoVerdict(vote.Verdict), Confidence: vote.Confidence,
+				Summary: vote.Summary, Findings: voteFindings, Provider: vote.Provider, Model: vote.Model, ModelVersion: vote.ModelVersion,
 			})
+		}
+		checks := make([]*moderationv1.PolicyCheck, 0, len(operation.Result.Checks))
+		for _, check := range operation.Result.Checks {
+			checks = append(checks, &moderationv1.PolicyCheck{Code: check.Code, Passed: check.Passed, Detail: check.Detail})
 		}
 		result.Result = &moderationv1.ReviewResult{
 			Verdict: toProtoVerdict(operation.Result.Verdict), Confidence: operation.Result.Confidence,
 			Summary: operation.Result.Summary, Findings: findings, Provider: operation.Result.Provider,
 			Model: operation.Result.Model, ModelVersion: operation.Result.ModelVersion, PolicyVersion: operation.Result.PolicyVersion,
+			Strategy: operation.Result.Strategy, Votes: votes, Checks: checks,
 		}
 	}
 	return result
+}
+
+func toProtoFinding(finding moderation.Finding) *moderationv1.PolicyFinding {
+	return &moderationv1.PolicyFinding{
+		Code: finding.Code, Category: finding.Category, Score: finding.Score, TimestampMs: finding.TimestampMS,
+	}
 }
 
 func toProtoStatus(value moderation.Status) moderationv1.ReviewStatus {

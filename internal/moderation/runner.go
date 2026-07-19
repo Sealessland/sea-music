@@ -82,6 +82,7 @@ func (ManualEscalationEvaluator) Evaluate(_ context.Context, _ ReviewRequest) (R
 		Verdict: VerdictEscalate, Confidence: 0,
 		Summary:  "automatic moderation provider is disabled; human review required",
 		Findings: []Finding{{Code: "provider_disabled", Category: "system", Score: 0}},
-		Provider: "manual-fallback", Model: "none",
+		Provider: "manual-fallback", Model: "none", Strategy: "manual-fallback-v1",
+		Checks: []PolicyCheck{{Code: "publication_authority", Passed: true, Detail: "agent evidence cannot publish content"}},
 	}, nil
 }

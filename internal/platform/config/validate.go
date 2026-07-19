@@ -81,6 +81,12 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.Moderation.ProviderModel) == "" {
 		return errors.New("SEA_MODERATION_PROVIDER_MODEL: must not be empty")
 	}
+	if c.Moderation.ApproveThreshold <= 0 || c.Moderation.ApproveThreshold > 1 {
+		return errors.New("SEA_MODERATION_APPROVE_THRESHOLD: must be within (0,1]")
+	}
+	if c.Moderation.RejectThreshold < c.Moderation.ApproveThreshold || c.Moderation.RejectThreshold > 1 {
+		return errors.New("SEA_MODERATION_REJECT_THRESHOLD: must be within [approve threshold,1]")
+	}
 	if c.Environment == "production" && c.Moderation.Insecure {
 		return errors.New("SEA_MODERATION_INSECURE: plaintext gRPC is not allowed in production")
 	}

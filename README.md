@@ -32,7 +32,7 @@
 | Social | 点赞、收藏、关注、评论（含回复）、弹幕；计数异步投影 + 周期对账修复漂移 |
 | Discovery | 热门榜（写时懒衰减热分）、关注流、个性化推荐；三类 feed 统一执行发布态/审核可见性/block 过滤；Redis 故障时显式降级 |
 | Events | Transactional Outbox 分发、Inbox 幂等消费、毒消息 DLQ、管理员重放（带审计） |
-| Moderation | Buf/Protobuf gRPC 契约、幂等长任务、租约接管、Eino 结构化模型输出、OpenAI-compatible provider、人工升级 fallback |
+| Moderation | Buf/Protobuf gRPC 契约、幂等长任务、租约接管、Eino reviewer→critic 双阶段审核、确定性策略门禁、可回放投票/检查轨迹、人工升级 fallback |
 | Platform | 配置 fail-fast 与生产护栏、gRPC mTLS、Lua 令牌桶限流、版本化迁移、OpenTelemetry/Prometheus、内嵌 Web 前台 |
 
 仓库内嵌一个零构建的 Web 前台（`internal/appapi/web`，go:embed 同源提供）：匿名热门流、注册/登录、推荐、关注流、播放详情、点赞/收藏/关注/评论/弹幕均可直接操作，便于本地演示与联调。
@@ -79,7 +79,7 @@ flowchart LR
 2. finalize 重新读取对象并核验长度、Content-Type 和 SHA-256，在**同一事务**中推进状态机、幂等入队转码任务并写 Outbox。
 3. Dispatcher 只有收到 Kafka ack 后才确认 Outbox 行；Worker 通过 Inbox 去重并领取带租约的处理任务。
 4. Worker 完成转码后，在同一事务写 `video.ready_for_moderation`；Kafka Inbox 幂等落本地 dispatch job，独立租约循环调用 gRPC Agent 并回收结果。
-5. Agent 使用 Eino 生成并校验结构化审核证据；默认 shadow 模式和无 provider fallback 都只能升级人工审核，视频领域仍独占发布授权。
+5. Agent 先由 reviewer 生成结构化候选证据，再由独立 critic 反证；确定性策略引擎要求 verdict 一致且达到配置阈值，否则升级人工。默认 shadow 模式和无 provider fallback 都不能改变视频状态，视频领域仍独占发布授权。
 6. 点赞/收藏/关注/评论/弹幕先写权威关系及 Outbox，消费者异步投影计数和热门分数；周期对账修复漂移。
 
 关键决策记录：[ADR 0001 模块化单体](docs/adr/0001-modular-monolith.md)、[ADR 0002 Transactional Outbox](docs/adr/0002-transactional-outbox.md)、[ADR 0003 直传与真实媒体处理](docs/adr/0003-direct-upload-media.md)。
@@ -93,7 +93,7 @@ flowchart LR
 3. **状态机 + 乐观版本 + 审计**：视频 7 态迁移做内存校验与 DB `WHERE version=$2` 双保险，每次迁移写 `state_transitions` 审计行（`internal/video/postgres.go:70`）。
 4. **媒体管线确定性幂等**：确定性 rendition key + `ON CONFLICT` upsert；任务租约心跳续约，失租立即 cancel 并终止 ffmpeg 子进程（`internal/video/processing.go:191`）；worker 崩溃后由其他实例接管有集成测试直接验证（`internal/video/ffmpeg_integration_test.go`）；另有兜底循环激活滞留 queued 的任务，消除"事件丢失 → 永不转码"的死角。
 5. **热分写时懒衰减与显式降级**：无需定时全量重算，单条 upsert 用 `calculated_at` 做指数衰减 `score = old * exp(-Δt/τ) + w`，事件主键天然去重（`internal/discovery/hot.go:53`）；DB 是权威，Redis 仅作读路径，Redis 故障时自动降级为 DB 快照并在响应中显式携带 `degraded` 标志。
-6. **Agent 审核不越权**：`StartReview` 以 request ID + 输入哈希保证幂等，operation/dispatch 两级任务均用 `SKIP LOCKED`、租约 owner 和有界重试；Eino 输出必须通过结构化校验，模型结论强制 `can_publish=false`。gRPC 暴露 health、OpenTelemetry 与 Prometheus RED 指标，生产环境强制双向 TLS。
+6. **Agent 审核不越权**：`StartReview` 以 request ID + 输入哈希保证幂等，operation/dispatch 两级任务均用 `SKIP LOCKED`、租约 owner 和有界重试；reviewer/critic 的原始投票经过结构化校验后由 Go 策略引擎做一致性与置信度门禁，模型结论强制 `can_publish=false`。结果保留 votes/checks/strategy 供审计与离线回放；gRPC 暴露 health、OpenTelemetry、策略失败计数和 RED 指标，生产环境强制双向 TLS。
 7. **计数最终一致与对账**：`GREATEST(x+delta,0)` 防负 upsert；周期 reconciler 从权威表重算（正确过滤软删评论/不可见弹幕），drift 落审计表并导出 Prometheus 指标（`internal/social/reconciliation.go:44`）。
 8. **限流与降级策略**：认证先于限流，已认证用户按 `user:<id>` 桶、匿名按 IP 桶；fail-open/closed 按业务区分——读放行、登录注册写拒绝；Lua 令牌桶带时钟回拨守卫（`internal/platform/ratelimit/ratelimit.go:14`）。
 9. **配置 fail-fast 与生产护栏**：本地零配置可运行，`SEA_ENV=production` 下残留本地默认凭据将直接拒绝启动；token key 下限 32 字节、CORS 禁通配符（`internal/platform/config/config.go:262`）。
@@ -240,6 +240,7 @@ openspec/                 # spec-driven 开发过程材料
 | `SEA_MODERATION_MODE` / `..._POLICY_VERSION` | `shadow` / `v1` | 审核运行模式与幂等输入中的策略版本 |
 | `SEA_MODERATION_PROVIDER` | `disabled` | `disabled` 安全升级人工；`openai` 启用 Eino OpenAI-compatible provider |
 | `SEA_MODERATION_PROVIDER_API_KEY` / `..._BASE_URL` / `..._MODEL` | 空 / 空 / `gpt-4o-mini` | provider 凭据、兼容端点和模型；密钥不会写日志 |
+| `SEA_MODERATION_APPROVE_THRESHOLD` / `..._REJECT_THRESHOLD` | `0.90` / `0.95` | reviewer/critic 一致后仍必须达到的确定性门禁；reject 默认更严格 |
 | `SEA_MODERATION_INSECURE` / `SEA_MODERATION_TLS_*` | `true` / 空 | 本地可明文；production 强制 cert/key/CA 双向 TLS |
 
 compose 侧端口与凭据见 [.env.example](.env.example)（模板，真实 `.env` 不入库）。

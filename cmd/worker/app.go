@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -16,11 +20,18 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/sealessland/sea-music/internal/discovery"
 	"github.com/sealessland/sea-music/internal/events"
+	moderationv1 "github.com/sealessland/sea-music/internal/gen/moderation/v1"
+	"github.com/sealessland/sea-music/internal/moderation"
+	"github.com/sealessland/sea-music/internal/moderation/grpcadapter"
 	"github.com/sealessland/sea-music/internal/platform/config"
 	"github.com/sealessland/sea-music/internal/platform/logging"
 	"github.com/sealessland/sea-music/internal/platform/telemetry"
 	"github.com/sealessland/sea-music/internal/social"
 	"github.com/sealessland/sea-music/internal/video"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // run is the worker composition root. It owns process-scoped resources and
@@ -73,7 +84,16 @@ func run() error {
 
 	hostname, _ := os.Hostname()
 	workerID := fmt.Sprintf("%s-%d", hostname, os.Getpid())
-	repository := video.NewPostgresRepository(database)
+	eventRepository := events.NewPostgresRepository(database)
+	outboxWriter := video.OutboxWriterFunc(func(ctx context.Context, transaction *sql.Tx, event video.DomainEvent) (string, error) {
+		envelope, err := eventRepository.EnqueueTx(ctx, transaction, events.NewEvent{
+			Topic: event.Topic, Type: event.Type, Version: event.Version,
+			AggregateType: event.AggregateType, AggregateID: event.AggregateID, AggregateVersion: event.AggregateVersion,
+			OccurredAt: time.Now().UTC(), TraceParent: telemetry.TraceParent(ctx), Data: event.Data,
+		})
+		return envelope.ID, err
+	})
+	repository := video.NewPostgresRepository(database).WithOutbox(outboxWriter)
 	processor := video.NewFFmpegProcessor(store, cfg.Worker.FFprobePath, cfg.Worker.FFmpegPath, cfg.Worker.MediaTimeout, cfg.ObjectStore.MaxUploadBytes)
 	service := video.NewProcessingService(repository, processor, workerID, cfg.Worker.LeaseDuration)
 
@@ -85,7 +105,7 @@ func run() error {
 	if err := publisher.Ping(ctx); err != nil {
 		return fmt.Errorf("ping Kafka broker: %w", err)
 	}
-	dispatcher := events.NewDispatcher(events.NewPostgresRepository(database), publisher, workerID, cfg.Events.BatchSize, cfg.Events.LeaseDuration)
+	dispatcher := events.NewDispatcher(eventRepository, publisher, workerID, cfg.Events.BatchSize, cfg.Events.LeaseDuration)
 
 	redisOptions, err := redis.ParseURL(cfg.Redis.URL)
 	if err != nil {
@@ -125,6 +145,26 @@ func run() error {
 		return err
 	}
 	defer hotConsumer.Close()
+	moderationConsumer, err := events.NewKafkaConsumer(events.ConsumerConfig{
+		Brokers: cfg.Broker.Brokers, Topic: "domain-events", Group: "sea-music-moderation-dispatch-v1",
+		Name: "moderation-dispatch", MaxAttempts: 5, BaseBackoff: 100 * time.Millisecond,
+	}, events.NewInbox(database), eventRepository)
+	if err != nil {
+		return err
+	}
+	defer moderationConsumer.Close()
+	transportCredentials, err := moderationClientCredentials(cfg)
+	if err != nil {
+		return err
+	}
+	moderationConnection, err := grpc.NewClient(cfg.Moderation.AgentAddress,
+		grpc.WithTransportCredentials(transportCredentials), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	if err != nil {
+		return fmt.Errorf("create moderation gRPC client: %w", err)
+	}
+	defer moderationConnection.Close()
+	moderationClient := grpcadapter.NewClient(moderationv1.NewModerationServiceClient(moderationConnection), cfg.Moderation.RPCTimeout)
+	moderationDispatcher := moderation.NewDispatcher(database, moderationClient, workerID, cfg.ObjectStore.Bucket, cfg.Moderation.PolicyVersion, moderation.Mode(cfg.Moderation.Mode), cfg.Moderation.LeaseDuration, cfg.Moderation.PollInterval)
 
 	counterProjector := social.NewCounterProjector(redisClient)
 	counterReconciler := social.NewCounterReconciler(database, redisClient)
@@ -133,7 +173,7 @@ func run() error {
 	logger.Info("worker started", "worker_id", workerID)
 	defer logger.Info("worker stopped", "worker_id", workerID)
 	var wait sync.WaitGroup
-	wait.Add(7)
+	wait.Add(9)
 	go func() {
 		defer wait.Done()
 		runMediaLoop(ctx, service, cfg.Worker.PollInterval, logger)
@@ -162,7 +202,37 @@ func run() error {
 		defer wait.Done()
 		runEventLoop(ctx, dispatcher, cfg.Events.PollInterval, logger)
 	}()
+	go func() {
+		defer wait.Done()
+		runModerationConsumerLoop(ctx, moderationConsumer, logger)
+	}()
+	go func() {
+		defer wait.Done()
+		runModerationDispatchLoop(ctx, moderationDispatcher, cfg.Moderation.PollInterval, logger)
+	}()
 	<-ctx.Done()
 	wait.Wait()
 	return nil
+}
+
+func moderationClientCredentials(cfg config.Config) (credentials.TransportCredentials, error) {
+	if cfg.Moderation.Insecure {
+		return insecure.NewCredentials(), nil
+	}
+	certificate, err := tls.LoadX509KeyPair(cfg.Moderation.TLSCertFile, cfg.Moderation.TLSKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("load moderation client certificate: %w", err)
+	}
+	caPEM, err := os.ReadFile(cfg.Moderation.TLSCAFile)
+	if err != nil {
+		return nil, fmt.Errorf("read moderation server CA: %w", err)
+	}
+	rootCAs := x509.NewCertPool()
+	if !rootCAs.AppendCertsFromPEM(caPEM) {
+		return nil, errors.New("parse moderation server CA")
+	}
+	return credentials.NewTLS(&tls.Config{
+		MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{certificate},
+		RootCAs: rootCAs, ServerName: cfg.Moderation.TLSServerName,
+	}), nil
 }

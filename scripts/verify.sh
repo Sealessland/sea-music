@@ -16,6 +16,7 @@ export SEA_VIDEO_TEST_DATABASE_URL="${SEA_VIDEO_TEST_DATABASE_URL:-postgres://se
 export SEA_EVENTS_TEST_DATABASE_URL="${SEA_EVENTS_TEST_DATABASE_URL:-postgres://sea_music:local-postgres-password@127.0.0.1:25432/sea_music_events_test?sslmode=disable}"
 export SEA_SOCIAL_TEST_DATABASE_URL="${SEA_SOCIAL_TEST_DATABASE_URL:-postgres://sea_music:local-postgres-password@127.0.0.1:25432/sea_music_social_test?sslmode=disable}"
 export SEA_DISCOVERY_TEST_DATABASE_URL="${SEA_DISCOVERY_TEST_DATABASE_URL:-postgres://sea_music:local-postgres-password@127.0.0.1:25432/sea_music_discovery_test?sslmode=disable}"
+export SEA_MODERATION_TEST_DATABASE_URL="${SEA_MODERATION_TEST_DATABASE_URL:-postgres://sea_music:local-postgres-password@127.0.0.1:25432/sea_music_moderation_test?sslmode=disable}"
 export SEA_EVENTS_TEST_BROKER="${SEA_EVENTS_TEST_BROKER:-127.0.0.1:29092}"
 export SEA_VIDEO_TEST_S3_ENDPOINT="${SEA_VIDEO_TEST_S3_ENDPOINT:-http://127.0.0.1:28333}"
 export SEA_REDIS_TEST_URL="${SEA_REDIS_TEST_URL:-redis://:local-redis-password@127.0.0.1:26379/15}"
@@ -31,6 +32,7 @@ SEA_TEST_DATABASE_NAME=sea_music_video_test go run -buildvcs=false ./cmd/testdb
 SEA_TEST_DATABASE_NAME=sea_music_events_test go run -buildvcs=false ./cmd/testdb
 SEA_TEST_DATABASE_NAME=sea_music_social_test go run -buildvcs=false ./cmd/testdb
 SEA_TEST_DATABASE_NAME=sea_music_discovery_test go run -buildvcs=false ./cmd/testdb
+SEA_TEST_DATABASE_NAME=sea_music_moderation_test go run -buildvcs=false ./cmd/testdb
 SEA_DATABASE_URL="$SEA_API_TEST_DATABASE_URL" go run -buildvcs=false ./cmd/migrate up
 docker compose exec -T redis sh -c 'redis-cli -a "$REDIS_PASSWORD" -n 14 FLUSHDB >/dev/null'
 
@@ -43,6 +45,9 @@ go build -buildvcs=false -o "$API_BINARY" ./cmd/api
 WORKER_BINARY=/tmp/sea-music-worker-verify
 WORKER_LOG=/tmp/sea-music-worker-verify.log
 go build -buildvcs=false -o "$WORKER_BINARY" ./cmd/worker
+MODERATION_BINARY=/tmp/sea-music-moderation-agent-verify
+MODERATION_LOG=/tmp/sea-music-moderation-agent-verify.log
+go build -buildvcs=false -o "$MODERATION_BINARY" ./cmd/moderation-agent
 
 SEA_AUTH_TOKEN_KEY=0123456789abcdef0123456789abcdef \
 SEA_DATABASE_URL="$SEA_API_TEST_DATABASE_URL" \
@@ -53,11 +58,16 @@ SEA_HTTP_ADDRESS="${SEA_VERIFY_HTTP_ADDRESS:-127.0.0.1:38081}" \
 "$API_BINARY" >"$API_LOG" 2>&1 &
 API_PID=$!
 WORKER_PID=
+MODERATION_PID=
 
 cleanup() {
     if [ -n "$WORKER_PID" ] && kill -0 "$WORKER_PID" 2>/dev/null; then
         kill -TERM "$WORKER_PID"
         wait "$WORKER_PID"
+    fi
+    if [ -n "$MODERATION_PID" ] && kill -0 "$MODERATION_PID" 2>/dev/null; then
+        kill -TERM "$MODERATION_PID"
+        wait "$MODERATION_PID"
     fi
     if kill -0 "$API_PID" 2>/dev/null; then
         kill -TERM "$API_PID"
@@ -212,8 +222,27 @@ fi
 
 SEA_AUTH_TOKEN_KEY=0123456789abcdef0123456789abcdef \
 SEA_DATABASE_URL="$SEA_API_TEST_DATABASE_URL" \
+SEA_MODERATION_GRPC_ADDRESS=127.0.0.1:39091 \
+SEA_MODERATION_METRICS_ADDRESS=127.0.0.1:39092 \
+"$MODERATION_BINARY" >"$MODERATION_LOG" 2>&1 &
+MODERATION_PID=$!
+MODERATION_READY_ATTEMPT=0
+until curl --fail --silent --show-error http://127.0.0.1:39092/readyz >/dev/null; do
+    MODERATION_READY_ATTEMPT=$((MODERATION_READY_ATTEMPT + 1))
+    if [ "$MODERATION_READY_ATTEMPT" -ge 30 ]; then
+        echo "moderation agent did not become ready; log follows" >&2
+        sed -n '1,200p' "$MODERATION_LOG" >&2
+        exit 1
+    fi
+    sleep 0.2
+done
+
+SEA_AUTH_TOKEN_KEY=0123456789abcdef0123456789abcdef \
+SEA_DATABASE_URL="$SEA_API_TEST_DATABASE_URL" \
 SEA_REDIS_URL="$SEA_API_REDIS_URL" \
 SEA_COUNTER_RECONCILE_INTERVAL=250ms \
+SEA_MODERATION_AGENT_ADDRESS=127.0.0.1:39091 \
+SEA_MODERATION_POLL_INTERVAL=100ms \
 "$WORKER_BINARY" >"$WORKER_LOG" 2>&1 &
 WORKER_PID=$!
 PROCESS_ATTEMPT=0
@@ -233,6 +262,32 @@ RENDITION_COUNT=$(docker compose exec -T postgres psql -U sea_music -d sea_music
     "SELECT count(*) FROM video.renditions r JOIN video.source_assets a ON a.id = r.source_asset_id WHERE a.video_id = '$VIDEO_ID' AND r.status = 'ready'" | tr -d '[:space:]')
 if [ "$RENDITION_COUNT" != "2" ]; then
     echo "worker produced $RENDITION_COUNT ready renditions, want 2" >&2
+    exit 1
+fi
+MODERATION_ATTEMPT=0
+MODERATION_STATE=
+until [ "$MODERATION_STATE" = "completed" ]; do
+    MODERATION_ATTEMPT=$((MODERATION_ATTEMPT + 1))
+    if [ "$MODERATION_ATTEMPT" -ge 80 ]; then
+        echo "agent moderation did not complete; agent and worker logs follow" >&2
+        sed -n '1,200p' "$MODERATION_LOG" >&2
+        sed -n '1,200p' "$WORKER_LOG" >&2
+        exit 1
+    fi
+    sleep 0.25
+    MODERATION_STATE=$(docker compose exec -T postgres psql -U sea_music -d sea_music_api_test -tAc \
+        "SELECT state FROM moderation.dispatch_jobs WHERE video_id = '$VIDEO_ID'" | tr -d '[:space:]')
+done
+MODERATION_VERDICT=$(docker compose exec -T postgres psql -U sea_music -d sea_music_api_test -tAc \
+    "SELECT result->>'verdict' FROM moderation.dispatch_jobs WHERE video_id = '$VIDEO_ID'" | tr -d '[:space:]')
+if [ "$MODERATION_VERDICT" != "escalate" ]; then
+    echo "disabled-provider shadow verdict was $MODERATION_VERDICT, want escalate" >&2
+    exit 1
+fi
+curl --fail --silent --show-error http://127.0.0.1:39092/metrics > /tmp/sea-music-moderation-metrics.txt
+if ! rg --quiet 'grpc_server_handled_total\{.*grpc_code="OK".*\} [1-9]' /tmp/sea-music-moderation-metrics.txt; then
+    echo "moderation gRPC success counter was not collected" >&2
+    sed -n '1,160p' /tmp/sea-music-moderation-metrics.txt >&2
     exit 1
 fi
 docker compose exec -T postgres psql -U sea_music -d sea_music_api_test -v ON_ERROR_STOP=1 -c \
@@ -354,17 +409,17 @@ if [ "$WITHDRAWN_HOT_ITEMS" != "0" ]; then
     exit 1
 fi
 EVENT_CHAIN_ATTEMPT=0
-EVENT_CHAIN_COUNT=0
-until [ "$EVENT_CHAIN_COUNT" = "5" ]; do
+EVENT_CHAIN_TYPES=0
+until [ "$EVENT_CHAIN_TYPES" = "7" ]; do
     EVENT_CHAIN_ATTEMPT=$((EVENT_CHAIN_ATTEMPT + 1))
     if [ "$EVENT_CHAIN_ATTEMPT" -ge 40 ]; then
-        echo "event chain did not publish and consume all five video/social events" >&2
+        echo "event chain did not publish and consume every expected video/social/moderation event type" >&2
         sed -n '1,200p' "$WORKER_LOG" >&2
         exit 1
     fi
     sleep 0.25
-    EVENT_CHAIN_COUNT=$(docker compose exec -T postgres psql -U sea_music -d sea_music_api_test -tAc \
-        "SELECT count(*) FROM eventing.outbox o JOIN eventing.inbox i ON i.event_id = o.id AND i.consumer_name = 'media-job-activation' WHERE o.aggregate_id = '$VIDEO_ID' AND o.state = 'published'" | tr -d '[:space:]')
+    EVENT_CHAIN_TYPES=$(docker compose exec -T postgres psql -U sea_music -d sea_music_api_test -tAc \
+        "WITH expected(event_type, event_count) AS (VALUES ('video.source_finalized',1),('video.ready_for_moderation',1),('video.published',1),('video.withdrawn',1),('social.like.changed',2),('social.comment.created',1),('social.danmaku.created',1)) SELECT count(*) FROM expected e WHERE (SELECT count(*) FROM eventing.outbox o JOIN eventing.inbox i ON i.event_id = o.id AND i.consumer_name = 'media-job-activation' WHERE o.event_type = e.event_type AND o.state = 'published') = e.event_count" | tr -d '[:space:]')
 done
 COUNTER_ATTEMPT=0
 COUNTER_RESULT=
@@ -491,8 +546,7 @@ if ! rg --quiet 'sea_music_processing_jobs\{state="succeeded"\} 1' /tmp/sea-musi
     exit 1
 fi
 
-kill -TERM "$API_PID"
-wait "$API_PID"
+cleanup
 trap - EXIT INT TERM
 
 echo "verification complete"

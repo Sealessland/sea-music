@@ -11,6 +11,7 @@ import (
 
 	"github.com/sealessland/sea-music/internal/discovery"
 	"github.com/sealessland/sea-music/internal/events"
+	"github.com/sealessland/sea-music/internal/moderation"
 	"github.com/sealessland/sea-music/internal/social"
 	"github.com/sealessland/sea-music/internal/video"
 )
@@ -28,6 +29,54 @@ func runHotLoop(ctx context.Context, consumer *events.KafkaConsumer, projector *
 			logger.ErrorContext(ctx, "hot ranking event consumption failed", "error", err)
 		} else if processed {
 			logger.InfoContext(ctx, "hot ranking event consumed")
+		}
+	}
+}
+
+func runModerationConsumerLoop(ctx context.Context, consumer *events.KafkaConsumer, logger *slog.Logger) {
+	handler := func(ctx context.Context, transaction *sql.Tx, envelope events.Envelope) error {
+		if envelope.Type != "video.ready_for_moderation" {
+			return nil
+		}
+		var data struct {
+			VideoID      string `json:"video_id"`
+			VideoVersion int64  `json:"video_version"`
+		}
+		if err := json.Unmarshal(envelope.Data, &data); err != nil {
+			return fmt.Errorf("decode moderation-ready event: %w", err)
+		}
+		return moderation.EnqueueDispatchTx(ctx, transaction, envelope.ID, data.VideoID, data.VideoVersion)
+	}
+	for {
+		processed, err := consumer.RunOnce(ctx, handler)
+		if ctx.Err() != nil {
+			return
+		}
+		if err != nil {
+			logger.ErrorContext(ctx, "moderation event consumption failed", "error", err)
+		} else if processed {
+			logger.InfoContext(ctx, "moderation event consumed")
+		}
+	}
+}
+
+func runModerationDispatchLoop(ctx context.Context, dispatcher *moderation.Dispatcher, pollInterval time.Duration, logger *slog.Logger) {
+	for {
+		job, err := dispatcher.RunOnce(ctx)
+		switch {
+		case err == nil:
+			logger.InfoContext(ctx, "moderation dispatch advanced", "dispatch_job_id", job.ID, "operation_id", job.OperationID)
+		case ctx.Err() != nil:
+			return
+		case !errors.Is(err, moderation.ErrNoOperation):
+			logger.ErrorContext(ctx, "moderation dispatch failed", "error", err)
+		}
+		timer := time.NewTimer(pollInterval)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
 		}
 	}
 }

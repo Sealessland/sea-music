@@ -32,6 +32,10 @@ func LoadFrom(lookup LookupEnv) (Config, error) {
 		{"SEA_EVENT_POLL_INTERVAL", &cfg.Events.PollInterval},
 		{"SEA_EVENT_LEASE_DURATION", &cfg.Events.LeaseDuration},
 		{"SEA_COUNTER_RECONCILE_INTERVAL", &cfg.Social.ReconcileInterval},
+		{"SEA_MODERATION_POLL_INTERVAL", &cfg.Moderation.PollInterval},
+		{"SEA_MODERATION_LEASE_DURATION", &cfg.Moderation.LeaseDuration},
+		{"SEA_MODERATION_EVALUATION_TIMEOUT", &cfg.Moderation.EvaluationTimeout},
+		{"SEA_MODERATION_RPC_TIMEOUT", &cfg.Moderation.RPCTimeout},
 	}
 	for _, item := range durations {
 		if err := parsePositiveDuration(lookup, item.key, item.target); err != nil {
@@ -54,6 +58,9 @@ func LoadFrom(lookup LookupEnv) (Config, error) {
 		return Config{}, err
 	}
 	if err := parseBool(lookup, "SEA_S3_DISABLE_DOWNLOAD_CACHE", &cfg.ObjectStore.DisableDownloadCache); err != nil {
+		return Config{}, err
+	}
+	if err := parseBool(lookup, "SEA_MODERATION_INSECURE", &cfg.Moderation.Insecure); err != nil {
 		return Config{}, err
 	}
 	if err := parsePositiveInt(lookup, "SEA_EVENT_BATCH_SIZE", &cfg.Events.BatchSize); err != nil {
@@ -118,6 +125,26 @@ func defaults(lookup LookupEnv) Config {
 			ReadinessTimeout:  2 * time.Second,
 			ShutdownTimeout:   10 * time.Second,
 			AllowedOrigins:    splitNonEmpty(valueOrDefault(lookup, "SEA_CORS_ALLOWED_ORIGINS", "http://localhost:5173")),
+		},
+		Moderation: Moderation{
+			GRPCAddress:       valueOrDefault(lookup, "SEA_MODERATION_GRPC_ADDRESS", ":9090"),
+			MetricsAddress:    valueOrDefault(lookup, "SEA_MODERATION_METRICS_ADDRESS", ":9091"),
+			AgentAddress:      valueOrDefault(lookup, "SEA_MODERATION_AGENT_ADDRESS", "127.0.0.1:9090"),
+			PolicyVersion:     valueOrDefault(lookup, "SEA_MODERATION_POLICY_VERSION", "v1"),
+			Mode:              valueOrDefault(lookup, "SEA_MODERATION_MODE", "shadow"),
+			Provider:          valueOrDefault(lookup, "SEA_MODERATION_PROVIDER", "disabled"),
+			ProviderAPIKey:    valueOrDefault(lookup, "SEA_MODERATION_PROVIDER_API_KEY", ""),
+			ProviderBaseURL:   valueOrDefault(lookup, "SEA_MODERATION_PROVIDER_BASE_URL", ""),
+			ProviderModel:     valueOrDefault(lookup, "SEA_MODERATION_PROVIDER_MODEL", "gpt-4o-mini"),
+			Insecure:          true,
+			TLSCertFile:       valueOrDefault(lookup, "SEA_MODERATION_TLS_CERT_FILE", ""),
+			TLSKeyFile:        valueOrDefault(lookup, "SEA_MODERATION_TLS_KEY_FILE", ""),
+			TLSCAFile:         valueOrDefault(lookup, "SEA_MODERATION_TLS_CA_FILE", ""),
+			TLSServerName:     valueOrDefault(lookup, "SEA_MODERATION_TLS_SERVER_NAME", ""),
+			PollInterval:      time.Second,
+			LeaseDuration:     2 * time.Minute,
+			EvaluationTimeout: 90 * time.Second,
+			RPCTimeout:        5 * time.Second,
 		},
 	}
 }

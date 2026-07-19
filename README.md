@@ -1,11 +1,11 @@
 # Sea Music
 
-面向 Bilibili 类 UGC 视频社区核心业务的 Go 后端项目，采用**模块化单体 API + 独立 Worker** 架构，覆盖身份鉴权、对象存储直传、媒体处理（ffprobe/ffmpeg）、审核发布、可靠事件投递（Transactional Outbox/Inbox/DLQ/重放）、社交互动、内容发现、全链路可观测与故障恢复。
+面向 Bilibili 类 UGC 视频社区核心业务的 Go 后端项目，采用**模块化单体 API + 独立 Worker + gRPC 审核 Agent** 架构，覆盖身份鉴权、对象存储直传、媒体处理（ffprobe/ffmpeg）、Agent 辅助审核、审核发布、可靠事件投递（Transactional Outbox/Inbox/DLQ/重放）、社交互动、内容发现、全链路可观测与故障恢复。
 
 所有关键链路运行在真实依赖（PostgreSQL / Redis / Kafka / SeaweedFS / ffmpeg）之上，核心设计均有基于真实依赖的集成测试、故障注入演练或可重放的性能数据佐证。
 
-- 规模：约 1.05 万行 Go（105 个文件，其中 43 个测试文件）、15 个版本化迁移、20 个业务端点
-- 形态：单 API 进程承载 4 个业务模块，独立 Worker 负责事件分发/消费、媒体任务与计数对账
+- 规模：约 1.38 万行 Go（132 个文件，其中 49 个测试文件）、17 个版本化迁移、20 个业务端点
+- 形态：单 API 进程承载 4 个业务模块，Worker 负责可靠事件/媒体任务，独立 gRPC Agent 负责异步审核证据生成
 - 验证：`make verify` 真实依赖 E2E、`make fault-drill` 故障演练、`make benchmark` k6 open-model 压测
 
 ## 目录
@@ -28,17 +28,18 @@
 | 模块 | 能力 |
 |---|---|
 | Identity | 注册/登录、双 token（access + refresh）、refresh token 轮换与家族级重放撤销、Argon2id 密码散列、基于角色的授权 |
-| Video | 投稿草稿、S3 预签名直传授权、finalize 校验（长度/类型/SHA-256）、7 态状态机（draft→uploaded→processing→review→published→withdrawn/failed）、审核发布、撤稿、真实 ffmpeg 转码与封面生成 |
+| Video | 投稿草稿、S3 预签名直传授权、finalize 校验（长度/类型/SHA-256）、7 态状态机、真实 ffmpeg 转码、Agent shadow 审核证据、人工审核发布与撤稿 |
 | Social | 点赞、收藏、关注、评论（含回复）、弹幕；计数异步投影 + 周期对账修复漂移 |
 | Discovery | 热门榜（写时懒衰减热分）、关注流、个性化推荐；三类 feed 统一执行发布态/审核可见性/block 过滤；Redis 故障时显式降级 |
 | Events | Transactional Outbox 分发、Inbox 幂等消费、毒消息 DLQ、管理员重放（带审计） |
-| Platform | 配置 fail-fast 与生产护栏、Lua 令牌桶限流、版本化迁移、OpenTelemetry 遥测、内嵌 Web 前台 |
+| Moderation | Buf/Protobuf gRPC 契约、幂等长任务、租约接管、Eino 结构化模型输出、OpenAI-compatible provider、人工升级 fallback |
+| Platform | 配置 fail-fast 与生产护栏、gRPC mTLS、Lua 令牌桶限流、版本化迁移、OpenTelemetry/Prometheus、内嵌 Web 前台 |
 
 仓库内嵌一个零构建的 Web 前台（`internal/appapi/web`，go:embed 同源提供）：匿名热门流、注册/登录、推荐、关注流、播放详情、点赞/收藏/关注/评论/弹幕均可直接操作，便于本地演示与联调。
 
 ## 技术栈
 
-- **语言/框架**：Go 1.26、Gin（含官方 CORS middleware）、pgx/v5、go-redis v9、franz-go（Kafka）、aws-sdk-go-v2（S3）
+- **语言/框架**：Go 1.26、Gin、gRPC/Protobuf/Buf、CloudWeGo Eino、pgx/v5、go-redis v9、franz-go、aws-sdk-go-v2
 - **数据与基础设施**：PostgreSQL 18、Redis 8、SeaweedFS（S3 兼容对象存储）、Apache Kafka 4（KRaft）
 - **可观测**：OpenTelemetry（otelhttp/otelpgx/redisotel/kotel + 手动 span）、Prometheus Go client、Grafana、Tempo、OTel Collector
 - **安全**：Argon2id（恒定时间比较）、HMAC 签名 token、SHA-256 存储 refresh token
@@ -63,7 +64,10 @@ flowchart LR
     Worker --> PG
     Worker --> S3
     Worker --> FF[ffprobe / ffmpeg]
-    API & Worker --> OTel[OTel Collector]
+    Worker -->|StartReview / GetReview| Agent[gRPC Moderation Agent]
+    Agent --> PG
+    Agent -->|optional| LLM[OpenAI-compatible provider]
+    API & Worker & Agent --> OTel[OTel Collector]
     OTel --> Tempo[Tempo]
     OTel --> Prom[Prometheus]
     Prom --> Grafana[Grafana]
@@ -74,8 +78,9 @@ flowchart LR
 1. 客户端创建草稿，API 生成用户隔离的对象 key 和短期 S3 PUT 预签名 URL，客户端直传源文件。
 2. finalize 重新读取对象并核验长度、Content-Type 和 SHA-256，在**同一事务**中推进状态机、幂等入队转码任务并写 Outbox。
 3. Dispatcher 只有收到 Kafka ack 后才确认 Outbox 行；Worker 通过 Inbox 去重并领取带租约的处理任务。
-4. Worker 运行真实 ffprobe/ffmpeg，上传确定性 rendition 与封面，将视频推进到审核态；审核通过后才对外可见。
-5. 点赞/收藏/关注/评论/弹幕先写权威关系及 Outbox，消费者异步投影计数和热门分数；周期对账修复漂移。
+4. Worker 完成转码后，在同一事务写 `video.ready_for_moderation`；Kafka Inbox 幂等落本地 dispatch job，独立租约循环调用 gRPC Agent 并回收结果。
+5. Agent 使用 Eino 生成并校验结构化审核证据；默认 shadow 模式和无 provider fallback 都只能升级人工审核，视频领域仍独占发布授权。
+6. 点赞/收藏/关注/评论/弹幕先写权威关系及 Outbox，消费者异步投影计数和热门分数；周期对账修复漂移。
 
 关键决策记录：[ADR 0001 模块化单体](docs/adr/0001-modular-monolith.md)、[ADR 0002 Transactional Outbox](docs/adr/0002-transactional-outbox.md)、[ADR 0003 直传与真实媒体处理](docs/adr/0003-direct-upload-media.md)。
 
@@ -88,11 +93,12 @@ flowchart LR
 3. **状态机 + 乐观版本 + 审计**：视频 7 态迁移做内存校验与 DB `WHERE version=$2` 双保险，每次迁移写 `state_transitions` 审计行（`internal/video/postgres.go:70`）。
 4. **媒体管线确定性幂等**：确定性 rendition key + `ON CONFLICT` upsert；任务租约心跳续约，失租立即 cancel 并终止 ffmpeg 子进程（`internal/video/processing.go:191`）；worker 崩溃后由其他实例接管有集成测试直接验证（`internal/video/ffmpeg_integration_test.go`）；另有兜底循环激活滞留 queued 的任务，消除"事件丢失 → 永不转码"的死角。
 5. **热分写时懒衰减与显式降级**：无需定时全量重算，单条 upsert 用 `calculated_at` 做指数衰减 `score = old * exp(-Δt/τ) + w`，事件主键天然去重（`internal/discovery/hot.go:53`）；DB 是权威，Redis 仅作读路径，Redis 故障时自动降级为 DB 快照并在响应中显式携带 `degraded` 标志。
-6. **计数最终一致与对账**：`GREATEST(x+delta,0)` 防负 upsert；周期 reconciler 从权威表重算（正确过滤软删评论/不可见弹幕），drift 落审计表并导出 Prometheus 指标（`internal/social/reconciliation.go:44`）。
-7. **限流与降级策略**：认证先于限流，已认证用户按 `user:<id>` 桶、匿名按 IP 桶；fail-open/closed 按业务区分——读放行、登录注册写拒绝；Lua 令牌桶带时钟回拨守卫（`internal/platform/ratelimit/ratelimit.go:14`）。
-8. **配置 fail-fast 与生产护栏**：本地零配置可运行，`SEA_ENV=production` 下残留本地默认凭据将直接拒绝启动；token key 下限 32 字节、CORS 禁通配符（`internal/platform/config/config.go:262`）。
-9. **架构边界测试**：AST 测试禁止 domain 模块互相 import（`internal/architecture/boundaries_test.go`），当前四个模块零越界、零循环依赖。
-10. **回归驱动的性能优化**：通过 trace 定位到详情请求重复生成两个 SigV4 URL 的 CPU 热点，先补充缓存容量上限回归测试，再实现过期感知、最多 10,000 项的进程内缓存；`SEA_S3_DISABLE_DOWNLOAD_CACHE=true` 可一键回退，便于故障隔离与 A/B 对比（ADR 0003）。
+6. **Agent 审核不越权**：`StartReview` 以 request ID + 输入哈希保证幂等，operation/dispatch 两级任务均用 `SKIP LOCKED`、租约 owner 和有界重试；Eino 输出必须通过结构化校验，模型结论强制 `can_publish=false`。gRPC 暴露 health、OpenTelemetry 与 Prometheus RED 指标，生产环境强制双向 TLS。
+7. **计数最终一致与对账**：`GREATEST(x+delta,0)` 防负 upsert；周期 reconciler 从权威表重算（正确过滤软删评论/不可见弹幕），drift 落审计表并导出 Prometheus 指标（`internal/social/reconciliation.go:44`）。
+8. **限流与降级策略**：认证先于限流，已认证用户按 `user:<id>` 桶、匿名按 IP 桶；fail-open/closed 按业务区分——读放行、登录注册写拒绝；Lua 令牌桶带时钟回拨守卫（`internal/platform/ratelimit/ratelimit.go:14`）。
+9. **配置 fail-fast 与生产护栏**：本地零配置可运行，`SEA_ENV=production` 下残留本地默认凭据将直接拒绝启动；token key 下限 32 字节、CORS 禁通配符（`internal/platform/config/config.go:262`）。
+10. **架构边界测试**：AST 测试禁止 domain 模块互相 import（`internal/architecture/boundaries_test.go`），当前四个模块零越界、零循环依赖。
+11. **回归驱动的性能优化**：通过 trace 定位到详情请求重复生成两个 SigV4 URL 的 CPU 热点，先补充缓存容量上限回归测试，再实现过期感知、最多 10,000 项的进程内缓存；`SEA_S3_DISABLE_DOWNLOAD_CACHE=true` 可一键回退，便于故障隔离与 A/B 对比（ADR 0003）。
 
 全部代码的逐模块评审（含已修复项与已知缺口）见 [docs/backend-review.md](docs/backend-review.md)。
 
@@ -140,7 +146,8 @@ go run -buildvcs=false ./cmd/api
 
 - 前台首页：<http://127.0.0.1:8080/>（匿名热门流，以及注册/登录、推荐、关注流、播放、互动）
 - 本地 `8080` 被占用时可设置 `SEA_HTTP_ADDRESS=127.0.0.1:38080`
-- Worker 用同样的环境变量运行 `go run -buildvcs=false ./cmd/worker`
+- 审核 Agent：`go run -buildvcs=false ./cmd/moderation-agent`（默认 `:9090` gRPC、`:9091` health/metrics）
+- Worker 用同样的环境变量运行 `go run -buildvcs=false ./cmd/worker`；默认连接 `127.0.0.1:9090`
 
 可选观测栈：
 
@@ -155,7 +162,7 @@ docker compose --profile observability up -d --wait
 ## 验证与演练
 
 ```sh
-make verify                # 重建 8 个测试数据库，跑全部包测试 + 正式 API 真实 E2E
+make verify                # 重建 9 个测试数据库，跑 race 测试 + API/Worker/gRPC Agent 真实 E2E
 make verify-observability  # Collector→Tempo 真实查询到 API/Worker traces
 make fault-drill           # broker 宕机、ack 窗口崩溃、毒消息、Redis 降级、worker 中断接管
 make loadtest              # 固定 seed 的详情读/点赞突发/backlog 恢复 smoke
@@ -183,7 +190,8 @@ make final-verify          # 从空白数据卷重放全部验证流程（会先
 cmd/
   api/       # HTTP API：main.go 仅进程入口，app.go 显式装配依赖
   worker/    # 后台进程：app.go 装配资源，loops.go 承载可取消循环
-  migrate/   # 数据库迁移（15 个版本化 SQL，checksum 校验）
+  moderation-agent/ # gRPC 服务、Eino provider、health/metrics 与优雅停机
+  migrate/   # 数据库迁移（17 个版本化 SQL，checksum 校验）
   fixture/   # 固定 seed 开发/压测数据集装载
   loadtest/  # 负载 smoke runner
   testdb/    # 隔离测试数据库管理
@@ -193,11 +201,14 @@ internal/
   social/      # 关系、评论、弹幕、计数与对账
   discovery/   # 热门/关注/推荐 feed 与可见性过滤
   events/      # Outbox dispatcher、Inbox 消费、DLQ、重放
+  moderation/  # 审核 operation/dispatch、租约、Eino evaluator、gRPC 适配
+  gen/         # Buf 生成的 Protobuf/gRPC Go 代码
   appapi/      # HTTP 适配层（Gin）：解析/鉴权/校验/响应映射
   platform/    # 配置、迁移、遥测、限流、fixture 等横切设施
     config/    # config.go 模型、load.go 加载、validate.go 校验、parse.go 转换
   architecture/# 模块边界 AST 测试
 api/openapi.json          # OpenAPI 契约
+api/proto/                # 版本化 moderation.v1 gRPC 契约
 deploy/observability/     # Collector/Prometheus/Grafana/Tempo 配置与预置仪表盘
 benchmarks/k6/            # k6 压测脚本
 scripts/                  # bootstrap/verify/fault-drill/benchmark 等可重放脚本
@@ -224,6 +235,12 @@ openspec/                 # spec-driven 开发过程材料
 | `SEA_S3_DISABLE_DOWNLOAD_CACHE` | `false` | 签名 URL 缓存一键回退开关（A/B 用） |
 | `SEA_RATE_IDENTITY_WRITE_RATE` / `..._BURST` | 见代码 | 身份写接口限流参数 |
 | `SEA_MEDIA_QUEUED_ACTIVATION_INTERVAL` / `..._THRESHOLD` | `30s` / `2min` | 滞留转码任务兜底激活 |
+| `SEA_MODERATION_GRPC_ADDRESS` / `..._AGENT_ADDRESS` | `:9090` / `127.0.0.1:9090` | Agent 监听地址 / Worker 目标地址 |
+| `SEA_MODERATION_METRICS_ADDRESS` | `:9091` | Agent `/livez`、`/readyz` 和 Prometheus `/metrics` |
+| `SEA_MODERATION_MODE` / `..._POLICY_VERSION` | `shadow` / `v1` | 审核运行模式与幂等输入中的策略版本 |
+| `SEA_MODERATION_PROVIDER` | `disabled` | `disabled` 安全升级人工；`openai` 启用 Eino OpenAI-compatible provider |
+| `SEA_MODERATION_PROVIDER_API_KEY` / `..._BASE_URL` / `..._MODEL` | 空 / 空 / `gpt-4o-mini` | provider 凭据、兼容端点和模型；密钥不会写日志 |
+| `SEA_MODERATION_INSECURE` / `SEA_MODERATION_TLS_*` | `true` / 空 | 本地可明文；production 强制 cert/key/CA 双向 TLS |
 
 compose 侧端口与凭据见 [.env.example](.env.example)（模板，真实 `.env` 不入库）。
 
@@ -235,6 +252,7 @@ compose 侧端口与凭据见 [.env.example](.env.example)（模板，真实 `.e
 - 推荐目前为候选集计算排序、无游标分页；热门/推荐 feed 的分页是已知改进点。
 - 进程内签名 URL 缓存不跨实例共享，URL 撤销依赖短 TTL（剩余有效期 < 5s 不复用）。
 - 模块间共享一个 PostgreSQL 实例（schema 隔离 + 边界测试），这是模块化单体的有意妥协，未来拆分路径沿 schema 所有权与事件边界进行（ADR 0001）。
+- 首个 Eino provider 当前审核标题/描述等结构化元数据；asset URI/SHA-256 作为证据引用，尚未做视频帧/音轨多模态理解。Agent 始终不直接修改视频发布状态。
 - 性能数据来自单机压测环境，各组件同机运行，不构成生产容量或 SLA 声明。
 
 ## 文档索引
@@ -243,6 +261,7 @@ compose 侧端口与凭据见 [.env.example](.env.example)（模板，真实 `.e
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | 架构图、运行链路、一致性与降级边界 |
 | [docs/backend-review.md](docs/backend-review.md) | 逐模块设计评审：亮点、风险与改进清单 |
+| [docs/moderation-agent.md](docs/moderation-agent.md) | gRPC Agent 契约、可靠任务链、安全边界、指标与配置 |
 | [docs/adr/](docs/adr/0001-modular-monolith.md) | 3 份关键架构决策记录（ADR） |
 | [docs/performance/baseline.md](docs/performance/baseline.md) | 固定环境性能基线与 A/B 原始数据 |
 | [docs/performance/benchmark-methodology.md](docs/performance/benchmark-methodology.md) | 可复现 k6 open-model benchmark 方法与归档格式 |

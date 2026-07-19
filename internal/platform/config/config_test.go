@@ -39,6 +39,49 @@ func TestLoadUsesSafeOperationalDefaults(t *testing.T) {
 	if cfg.RateLimit.IdentityWriteRate != 5 || cfg.RateLimit.IdentityWriteBurst != 10 {
 		t.Errorf("identity write rate policy = %+v", cfg.RateLimit)
 	}
+	if cfg.Moderation.GRPCAddress != ":9090" || cfg.Moderation.MetricsAddress != ":9091" || cfg.Moderation.AgentAddress != "127.0.0.1:9090" {
+		t.Errorf("moderation addresses = %+v", cfg.Moderation)
+	}
+	if cfg.Moderation.Mode != "shadow" || cfg.Moderation.EvaluationTimeout >= cfg.Moderation.LeaseDuration {
+		t.Errorf("moderation safety defaults = %+v", cfg.Moderation)
+	}
+	if !cfg.Moderation.Insecure {
+		t.Fatal("development moderation transport should default to explicitly insecure local mode")
+	}
+}
+
+func TestLoadRejectsUnsafeModerationConfiguration(t *testing.T) {
+	base := map[string]string{"SEA_AUTH_TOKEN_KEY": strings.Repeat("k", 32)}
+	tests := []struct {
+		name, key, value string
+	}{
+		{"mode", "SEA_MODERATION_MODE", "automatic"},
+		{"empty policy", "SEA_MODERATION_POLICY_VERSION", ""},
+		{"timeout exceeds lease", "SEA_MODERATION_EVALUATION_TIMEOUT", "3m"},
+		{"provider", "SEA_MODERATION_PROVIDER", "unknown"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			values := make(map[string]string, len(base)+1)
+			for key, value := range base {
+				values[key] = value
+			}
+			values[test.key] = test.value
+			_, err := config.LoadFrom(mapLookup(values))
+			if err == nil || !strings.Contains(err.Error(), test.key) {
+				t.Fatalf("LoadFrom() error = %v, want %s error", err, test.key)
+			}
+		})
+	}
+}
+
+func TestLoadRequiresModerationProviderSecret(t *testing.T) {
+	_, err := config.LoadFrom(mapLookup(map[string]string{
+		"SEA_AUTH_TOKEN_KEY": strings.Repeat("k", 32), "SEA_MODERATION_PROVIDER": "openai",
+	}))
+	if err == nil || !strings.Contains(err.Error(), "SEA_MODERATION_PROVIDER_API_KEY") {
+		t.Fatalf("LoadFrom() error = %v", err)
+	}
 }
 
 func TestLoadRejectsWeakTokenKeyWithoutEchoingIt(t *testing.T) {

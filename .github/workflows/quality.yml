@@ -1,0 +1,62 @@
+name: Quality and integration
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/quality.yml"
+      - "api/proto/**"
+      - "cmd/**"
+      - "internal/**"
+      - "scripts/verify.sh"
+      - "buf*.yaml"
+      - "go.mod"
+      - "go.sum"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/quality.yml"
+      - "api/proto/**"
+      - "cmd/**"
+      - "internal/**"
+      - "scripts/verify.sh"
+      - "buf*.yaml"
+      - "go.mod"
+      - "go.sum"
+  workflow_dispatch:
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          version: 1.69.0
+
+      - name: Validate protobuf contract and generated code
+        run: |
+          make proto-lint
+          make proto-generate
+          git diff --exit-code -- api/proto internal/gen
+
+      - name: Install verification tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg jq ripgrep
+
+      - name: Run real-dependency verification
+        run: make verify

@@ -27,6 +27,7 @@ type Config struct {
 	Telemetry   Telemetry
 	RateLimit   RateLimit
 	HTTP        HTTP
+	Moderation  Moderation
 }
 
 type Auth struct {
@@ -104,6 +105,27 @@ type HTTP struct {
 	ReadinessTimeout  time.Duration
 	ShutdownTimeout   time.Duration
 	AllowedOrigins    []string
+}
+
+type Moderation struct {
+	GRPCAddress       string
+	MetricsAddress    string
+	AgentAddress      string
+	PolicyVersion     string
+	Mode              string
+	Provider          string
+	ProviderAPIKey    string
+	ProviderBaseURL   string
+	ProviderModel     string
+	Insecure          bool
+	TLSCertFile       string
+	TLSKeyFile        string
+	TLSCAFile         string
+	TLSServerName     string
+	PollInterval      time.Duration
+	LeaseDuration     time.Duration
+	EvaluationTimeout time.Duration
+	RPCTimeout        time.Duration
 }
 
 // Load reads process configuration from the environment.

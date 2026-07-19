@@ -1,4 +1,11 @@
-.PHONY: bootstrap verify verify-observability fault-drill loadtest benchmark final-verify
+.PHONY: bootstrap proto-lint proto-generate verify verify-observability fault-drill loadtest benchmark final-verify
+
+proto-lint:
+	buf format --diff --exit-code
+	buf lint
+
+proto-generate:
+	buf generate
 
 bootstrap:
 	./scripts/bootstrap.sh

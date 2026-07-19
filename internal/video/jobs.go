@@ -3,6 +3,7 @@ package video
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -261,6 +262,21 @@ func (repository *PostgresRepository) CompleteProcessingJob(ctx context.Context,
 		VALUES ($1, $2, 'review', 'media renditions completed', $3)
 	`, input.VideoID, current.State, current.Version+1); err != nil {
 		return ProcessingResult{}, fmt.Errorf("audit processing completion: %w", err)
+	}
+	if repository.outbox != nil {
+		payload, err := json.Marshal(map[string]any{
+			"video_id": input.VideoID, "source_asset_id": input.Job.SourceAssetID,
+			"config_version": input.Job.ConfigVersion, "video_version": current.Version + 1,
+		})
+		if err != nil {
+			return ProcessingResult{}, fmt.Errorf("encode moderation-ready event: %w", err)
+		}
+		if _, err := repository.outbox.Enqueue(ctx, transaction, DomainEvent{
+			Topic: "domain-events", Type: "video.ready_for_moderation", Version: 1,
+			AggregateType: "video", AggregateID: input.VideoID, AggregateVersion: current.Version + 1, Data: payload,
+		}); err != nil {
+			return ProcessingResult{}, fmt.Errorf("enqueue moderation-ready event: %w", err)
+		}
 	}
 	if err := transaction.Commit(); err != nil {
 		return ProcessingResult{}, fmt.Errorf("commit processing completion: %w", err)

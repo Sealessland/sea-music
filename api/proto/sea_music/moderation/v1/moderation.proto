@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package sea_music.moderation.v1;
+
+option go_package = "github.com/sealessland/sea-music/internal/gen/moderation/v1;moderationv1";
+
+service ModerationService {
+  rpc StartReview(StartReviewRequest) returns (StartReviewResponse);
+  rpc GetReview(GetReviewRequest) returns (GetReviewResponse);
+}
+
+enum ModerationMode {
+  MODERATION_MODE_UNSPECIFIED = 0;
+  MODERATION_MODE_SHADOW = 1;
+  MODERATION_MODE_ENFORCE = 2;
+}
+
+enum ReviewStatus {
+  REVIEW_STATUS_UNSPECIFIED = 0;
+  REVIEW_STATUS_PENDING = 1;
+  REVIEW_STATUS_RUNNING = 2;
+  REVIEW_STATUS_COMPLETED = 3;
+  REVIEW_STATUS_FAILED = 4;
+  REVIEW_STATUS_CANCELLED = 5;
+}
+
+enum ReviewVerdict {
+  REVIEW_VERDICT_UNSPECIFIED = 0;
+  REVIEW_VERDICT_APPROVE = 1;
+  REVIEW_VERDICT_REJECT = 2;
+  REVIEW_VERDICT_ESCALATE = 3;
+}
+
+message MediaAsset {
+  string kind = 1;
+  string uri = 2;
+  string sha256 = 3;
+  string media_type = 4;
+}
+
+message StartReviewRequest {
+  string request_id = 1;
+  string video_id = 2;
+  int64 video_version = 3;
+  string policy_version = 4;
+  ModerationMode mode = 5;
+  string title = 6;
+  string description = 7;
+  repeated MediaAsset assets = 8;
+}
+
+message GetReviewRequest {
+  string operation_id = 1;
+}
+
+message StartReviewResponse {
+  ReviewOperation operation = 1;
+}
+
+message GetReviewResponse {
+  ReviewOperation operation = 1;
+}
+
+message PolicyFinding {
+  string code = 1;
+  string category = 2;
+  double score = 3;
+  int64 timestamp_ms = 4;
+}
+
+message ReviewResult {
+  ReviewVerdict verdict = 1;
+  double confidence = 2;
+  string summary = 3;
+  repeated PolicyFinding findings = 4;
+  string provider = 5;
+  string model = 6;
+  string model_version = 7;
+  string policy_version = 8;
+}
+
+message ReviewOperation {
+  string operation_id = 1;
+  string request_id = 2;
+  ReviewStatus status = 3;
+  ReviewResult result = 4;
+  string error = 5;
+}

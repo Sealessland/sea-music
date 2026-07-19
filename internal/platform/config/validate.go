@@ -57,6 +57,39 @@ func (c Config) Validate() error {
 	if len(c.Broker.Brokers) == 0 {
 		return errors.New("SEA_KAFKA_BROKERS: at least one broker is required")
 	}
+	if strings.TrimSpace(c.Moderation.GRPCAddress) == "" {
+		return errors.New("SEA_MODERATION_GRPC_ADDRESS: must not be empty")
+	}
+	if strings.TrimSpace(c.Moderation.MetricsAddress) == "" {
+		return errors.New("SEA_MODERATION_METRICS_ADDRESS: must not be empty")
+	}
+	if strings.TrimSpace(c.Moderation.AgentAddress) == "" {
+		return errors.New("SEA_MODERATION_AGENT_ADDRESS: must not be empty")
+	}
+	if strings.TrimSpace(c.Moderation.PolicyVersion) == "" {
+		return errors.New("SEA_MODERATION_POLICY_VERSION: must not be empty")
+	}
+	if c.Moderation.Mode != "shadow" && c.Moderation.Mode != "enforce" {
+		return errors.New("SEA_MODERATION_MODE: must be shadow or enforce")
+	}
+	if c.Moderation.Provider != "disabled" && c.Moderation.Provider != "openai" {
+		return errors.New("SEA_MODERATION_PROVIDER: must be disabled or openai")
+	}
+	if c.Moderation.Provider == "openai" && strings.TrimSpace(c.Moderation.ProviderAPIKey) == "" {
+		return errors.New("SEA_MODERATION_PROVIDER_API_KEY: required for openai provider")
+	}
+	if strings.TrimSpace(c.Moderation.ProviderModel) == "" {
+		return errors.New("SEA_MODERATION_PROVIDER_MODEL: must not be empty")
+	}
+	if c.Environment == "production" && c.Moderation.Insecure {
+		return errors.New("SEA_MODERATION_INSECURE: plaintext gRPC is not allowed in production")
+	}
+	if !c.Moderation.Insecure && (strings.TrimSpace(c.Moderation.TLSCertFile) == "" || strings.TrimSpace(c.Moderation.TLSKeyFile) == "" || strings.TrimSpace(c.Moderation.TLSCAFile) == "") {
+		return errors.New("SEA_MODERATION_TLS_*: cert, key, and CA files are required when TLS is enabled")
+	}
+	if c.Moderation.EvaluationTimeout >= c.Moderation.LeaseDuration {
+		return errors.New("SEA_MODERATION_EVALUATION_TIMEOUT: must be shorter than SEA_MODERATION_LEASE_DURATION")
+	}
 	for _, broker := range c.Broker.Brokers {
 		if strings.TrimSpace(broker) == "" {
 			return errors.New("SEA_KAFKA_BROKERS: broker addresses must not be empty")

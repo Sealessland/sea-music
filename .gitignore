@@ -11,6 +11,7 @@
 .giter/
 .giter-agent.toml
 .giter-terminal.log
+.worktrees/
 
 # Generated runtime evidence (regenerable via make benchmark / make loadtest)
 artifacts/benchmarks/

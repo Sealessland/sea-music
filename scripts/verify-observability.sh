@@ -27,4 +27,23 @@ until [ "$API_TRACES" -gt 0 ] && [ "$WORKER_TRACES" -gt 0 ]; do
     fi
 done
 
-echo "observability verification complete: api_traces=$API_TRACES worker_traces=$WORKER_TRACES"
+METRICS_RESPONSE=$(mktemp)
+trap 'rm -f "$METRICS_RESPONSE"' EXIT
+attempt=0
+until curl --fail --silent --show-error --get \
+    --output "$METRICS_RESPONSE" \
+    --data-urlencode 'q={span.db.system.name!="" && true && resource.service.name != nil} | rate() by(resource.service.name)' \
+    --data-urlencode "start=$(( $(date +%s) - 300 ))" \
+    --data-urlencode "end=$(date +%s)" \
+    --data-urlencode 'step=5s' \
+    'http://127.0.0.1:33200/api/metrics/query_range'; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 30 ]; then
+        echo "Tempo TraceQL metrics query did not become ready" >&2
+        exit 1
+    fi
+    sleep 0.5
+done
+jq --exit-status '.series | type == "array"' "$METRICS_RESPONSE" >/dev/null
+
+echo "observability verification complete: api_traces=$API_TRACES worker_traces=$WORKER_TRACES traceql_metrics=ok"

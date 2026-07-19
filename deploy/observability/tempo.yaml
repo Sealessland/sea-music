@@ -18,5 +18,21 @@ storage:
     local:
       path: /var/tempo/blocks
 
+# TraceQL metrics queries against recent spans (for example, `| rate()`) are
+# served by the metrics-generator's local-blocks processor in Tempo 2.x.
+metrics_generator:
+  storage:
+    path: /var/tempo/generator/wal
+  processor:
+    local_blocks:
+      filter_server_spans: false
+      flush_to_storage: true
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors:
+        - local-blocks
+
 usage_report:
   reporting_enabled: false

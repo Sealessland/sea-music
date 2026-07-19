@@ -45,9 +45,11 @@ jobs:
           cache: true
 
       - name: Set up Buf
-        uses: bufbuild/buf-setup-action@v1
+        uses: bufbuild/buf-action@v1
         with:
           version: 1.69.0
+          setup_only: true
+          github_token: ${{ github.token }}
 
       - name: Validate protobuf contract and generated code
         run: |

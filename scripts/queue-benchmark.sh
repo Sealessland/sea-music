@@ -40,6 +40,7 @@ while [ "$repeat" -le "$REPEATS" ]; do
         SEA_KAFKA_BROKERS="127.0.0.1:$((29092 + port_offset))" \
         SEA_ROCKETMQ_ENDPOINT="127.0.0.1:$((28081 + port_offset))" \
         SEA_NATS_URL="nats://127.0.0.1:$((24222 + port_offset))" \
+        SEA_S3_ENDPOINT="http://127.0.0.1:$((28333 + port_offset))" \
         SEA_LOAD_DATABASE_URL="postgres://sea_music:local-postgres-password@127.0.0.1:$((25432 + port_offset))/sea_music?sslmode=disable" \
         SEA_LOAD_REDIS_URL="redis://:local-redis-password@127.0.0.1:$((26379 + port_offset))/11" \
         SEA_LOAD_RESET_COMPOSE=true \

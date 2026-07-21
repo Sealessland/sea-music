@@ -71,7 +71,10 @@ type Worker struct {
 }
 
 type Broker struct {
-	Brokers []string
+	Driver       string
+	Brokers      []string
+	AccessKey    string
+	AccessSecret string
 }
 
 type Events struct {

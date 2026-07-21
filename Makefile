@@ -1,4 +1,4 @@
-.PHONY: bootstrap proto-lint proto-generate verify verify-observability fault-drill loadtest benchmark final-verify
+.PHONY: bootstrap proto-lint proto-generate verify verify-observability fault-drill loadtest queue-benchmark benchmark final-verify
 
 proto-lint:
 	buf format --diff --exit-code
@@ -22,6 +22,9 @@ fault-drill:
 loadtest:
 	./scripts/loadtest.sh
 
+
+queue-benchmark:
+	./scripts/queue-benchmark.sh
 benchmark:
 	./scripts/benchmark.sh
 

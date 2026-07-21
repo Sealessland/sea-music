@@ -54,8 +54,11 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.Worker.FFprobePath) == "" || strings.TrimSpace(c.Worker.FFmpegPath) == "" {
 		return errors.New("SEA_FFPROBE_PATH and SEA_FFMPEG_PATH must not be empty")
 	}
+	if c.Broker.Driver != "kafka" && c.Broker.Driver != "rocketmq" {
+		return errors.New("SEA_EVENT_BROKER: must be kafka or rocketmq")
+	}
 	if len(c.Broker.Brokers) == 0 {
-		return errors.New("SEA_KAFKA_BROKERS: at least one broker is required")
+		return fmt.Errorf("%s: at least one endpoint is required", brokerEndpointKey(c.Broker.Driver))
 	}
 	if strings.TrimSpace(c.Moderation.GRPCAddress) == "" {
 		return errors.New("SEA_MODERATION_GRPC_ADDRESS: must not be empty")
@@ -98,8 +101,18 @@ func (c Config) Validate() error {
 	}
 	for _, broker := range c.Broker.Brokers {
 		if strings.TrimSpace(broker) == "" {
-			return errors.New("SEA_KAFKA_BROKERS: broker addresses must not be empty")
+			return fmt.Errorf("%s: endpoint addresses must not be empty", brokerEndpointKey(c.Broker.Driver))
 		}
 	}
+	if c.Broker.Driver == "rocketmq" && len(c.Broker.Brokers) != 1 {
+		return errors.New("SEA_ROCKETMQ_ENDPOINT: exactly one proxy endpoint is required")
+	}
 	return nil
+}
+
+func brokerEndpointKey(driver string) string {
+	if driver == "rocketmq" {
+		return "SEA_ROCKETMQ_ENDPOINT"
+	}
+	return "SEA_KAFKA_BROKERS"
 }

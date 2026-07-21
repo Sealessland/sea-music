@@ -72,7 +72,7 @@ func run() error {
 	if err := objectStore.Check(ctx); err != nil {
 		return err
 	}
-	eventPublisher, err := events.NewKafkaPublisher(cfg.Broker.Brokers)
+	eventPublisher, err := events.NewPublisher(eventBrokerConfig(cfg), "domain-events")
 	if err != nil {
 		return err
 	}

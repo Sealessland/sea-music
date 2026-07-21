@@ -143,6 +143,13 @@ func (repository *PostgresRepository) FailDelivery(ctx context.Context, event Ou
 	return nil
 }
 
+// Publisher delivers an outbox event and reports broker reachability. Successful Publish calls are durable broker acknowledgements.
+type Publisher interface {
+	Publish(context.Context, OutboxEvent) error
+	Ping(context.Context) error
+	Close()
+}
+
 type KafkaPublisher struct {
 	client *kgo.Client
 }
@@ -163,10 +170,18 @@ func NewKafkaPublisher(brokers []string) (*KafkaPublisher, error) {
 	return &KafkaPublisher{client: client}, nil
 }
 
-func (publisher *KafkaPublisher) Publish(ctx context.Context, event OutboxEvent) error {
-	value, err := json.Marshal(event.Envelope)
+func encodeEnvelope(envelope Envelope) ([]byte, error) {
+	value, err := json.Marshal(envelope)
 	if err != nil {
-		return fmt.Errorf("encode event envelope: %w", err)
+		return nil, fmt.Errorf("encode event envelope: %w", err)
+	}
+	return value, nil
+}
+
+func (publisher *KafkaPublisher) Publish(ctx context.Context, event OutboxEvent) error {
+	value, err := encodeEnvelope(event.Envelope)
+	if err != nil {
+		return err
 	}
 	headers := []kgo.RecordHeader{
 		{Key: "event_id", Value: []byte(event.Envelope.ID)},
@@ -190,13 +205,13 @@ func (publisher *KafkaPublisher) Close() {
 
 type Dispatcher struct {
 	repository    *PostgresRepository
-	publisher     *KafkaPublisher
+	publisher     Publisher
 	dispatcherID  string
 	batchSize     int
 	leaseDuration time.Duration
 }
 
-func NewDispatcher(repository *PostgresRepository, publisher *KafkaPublisher, dispatcherID string, batchSize int, leaseDuration time.Duration) *Dispatcher {
+func NewDispatcher(repository *PostgresRepository, publisher Publisher, dispatcherID string, batchSize int, leaseDuration time.Duration) *Dispatcher {
 	return &Dispatcher{repository: repository, publisher: publisher, dispatcherID: dispatcherID, batchSize: batchSize, leaseDuration: leaseDuration}
 }
 

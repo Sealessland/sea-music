@@ -85,6 +85,51 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  rocketmq-nameserver:
+    image: apache/rocketmq:5.3.2
+    profiles: ["rocketmq"]
+    command: ["sh", "mqnamesrv"]
+    ports:
+      - "${ROCKETMQ_NAMESERVER_PORT:-29876}:9876"
+    healthcheck:
+      test: ["CMD-SHELL", "sh mqadmin clusterList -n 127.0.0.1:9876 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.2
+    profiles: ["rocketmq"]
+    command: ["sh", "mqbroker", "-n", "rocketmq-nameserver:9876", "--enable-proxy"]
+    depends_on:
+      rocketmq-nameserver:
+        condition: service_healthy
+    ports:
+      - "${ROCKETMQ_PROXY_PORT:-28081}:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "sh mqadmin clusterList -n rocketmq-nameserver:9876 2>/dev/null | grep -q DefaultCluster"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  rocketmq-init:
+    image: apache/rocketmq:5.3.2
+    profiles: ["rocketmq"]
+    depends_on:
+      rocketmq-broker:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - >-
+        sh mqadmin updateTopic -n rocketmq-nameserver:9876 -c DefaultCluster -t domain-events
+        && sh mqadmin updateTopic -n rocketmq-nameserver:9876 -c DefaultCluster -t domain-events.dlq
+    restart: "no"
+
   tempo:
     image: grafana/tempo:2.10.5
     profiles: ["observability"]

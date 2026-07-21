@@ -2,7 +2,7 @@
 
 面向 Bilibili 类 UGC 视频社区核心业务的 Go 后端项目，采用**模块化单体 API + 独立 Worker + gRPC 审核 Agent** 架构，覆盖身份鉴权、对象存储直传、媒体处理（ffprobe/ffmpeg）、Agent 辅助审核、审核发布、可靠事件投递（Transactional Outbox/Inbox/DLQ/重放）、社交互动、内容发现、全链路可观测与故障恢复。
 
-所有关键链路运行在真实依赖（PostgreSQL / Redis / Kafka / SeaweedFS / ffmpeg）之上，核心设计均有基于真实依赖的集成测试、故障注入演练或可重放的性能数据佐证。
+所有关键链路运行在真实依赖（PostgreSQL / Redis / Kafka 或 RocketMQ / SeaweedFS / ffmpeg）之上，核心设计均有基于真实依赖的集成测试、故障注入演练或可重放的性能数据佐证。
 
 - 规模：约 1.38 万行 Go（132 个文件，其中 49 个测试文件）、17 个版本化迁移、20 个业务端点
 - 形态：单 API 进程承载 4 个业务模块，Worker 负责可靠事件/媒体任务，独立 gRPC Agent 负责异步审核证据生成
@@ -39,8 +39,8 @@
 
 ## 技术栈
 
-- **语言/框架**：Go 1.26、Gin、gRPC/Protobuf/Buf、CloudWeGo Eino、pgx/v5、go-redis v9、franz-go、aws-sdk-go-v2
-- **数据与基础设施**：PostgreSQL 18、Redis 8、SeaweedFS（S3 兼容对象存储）、Apache Kafka 4（KRaft）
+- **语言/框架**：Go 1.26、Gin、gRPC/Protobuf/Buf、CloudWeGo Eino、pgx/v5、go-redis v9、franz-go、Apache RocketMQ 5 Go client、aws-sdk-go-v2
+- **数据与基础设施**：PostgreSQL 18、Redis 8、SeaweedFS（S3 兼容对象存储）、Apache Kafka 4（KRaft，默认）或 Apache RocketMQ 5（Proxy）
 - **可观测**：OpenTelemetry（otelhttp/otelpgx/redisotel/kotel + 手动 span）、Prometheus Go client、Grafana、Tempo、OTel Collector
 - **安全**：Argon2id（恒定时间比较）、HMAC 签名 token、SHA-256 存储 refresh token
 - **媒体**：系统 ffprobe/ffmpeg 真实转码
@@ -59,8 +59,8 @@ flowchart LR
     API --> Redis[(Redis)]
     API --> S3[(SeaweedFS S3)]
     PG --> Outbox[Transactional Outbox]
-    Outbox --> Kafka[(Kafka)]
-    Kafka --> Worker[Go Worker]
+    Outbox --> MQ{Kafka / RocketMQ}
+    MQ --> Worker[Go Worker]
     Worker --> PG
     Worker --> S3
     Worker --> FF[ffprobe / ffmpeg]
@@ -122,7 +122,7 @@ flowchart LR
 - 固定 seed `20260713` 数据集：1,000 用户、500 视频、5,000 关注、4,000 点赞、1,500 收藏、1,000 评论、1,500 弹幕。
 - **签名 URL 缓存 A/B**（closed-model，三次中位数）：视频详情吞吐 2998 → 3645 RPS（+21.6%），p99 降低 12.0%，3,000 个 A/B 请求 0 错误。
 - **k6 open-model 复测**（`constant-arrival-rate`，pareto80 访问分布，500 RPS）：缓存组 p95 6.1ms vs 无缓存 36.0ms（-83%），p99 13.7ms vs 92.7ms（-85%），`dropped_iterations=0`，错误率 0。方法见 [benchmark-methodology](docs/performance/benchmark-methodology.md)。
-- **写突发恢复**：500 个突发关系请求后，Outbox 全链路（pending + in-flight publishing）恢复 976ms，最终三种状态均为 0；负载后 SQL 池未见饱和。
+- **消息队列对比**（GitHub `ubuntu-24.04` runner，同提交、500 写请求 × 3 次中位数）：取消有积压时的固定轮询等待后，Kafka `1302.0 RPS / p95 32.3ms / p99 47.3ms / Outbox 恢复 0.135s`；RocketMQ `1081.2 RPS / p95 42.4ms / p99 75.0ms / Outbox 恢复 2.753s`；两组各 3,000 个总请求、0 错误。RocketMQ 恢复时间较修改前的 3.779s 降低 27.2%；原始 JSON/Prometheus/SHA256 见 [CI run 29816342278](https://github.com/Sealessland/sea-music/actions/runs/29816342278)，仅作为该 runner 的成对比较，不外推为生产 SLA。
 
 ## 快速开始
 
@@ -132,7 +132,7 @@ flowchart LR
 make bootstrap
 ```
 
-该命令启动 PostgreSQL、Redis、SeaweedFS S3 API 和 Apache Kafka，应用数据库迁移，并装载固定 seed 的开发 fixture。
+该命令启动 PostgreSQL、Redis、SeaweedFS S3 API 和默认 Apache Kafka，应用数据库迁移，并装载固定 seed 的开发 fixture。RocketMQ 运行 `docker compose --profile rocketmq up -d --wait rocketmq-nameserver rocketmq-broker`；随后用 `SEA_EVENT_BROKER=rocketmq` 启动 API 和 Worker。
 
 启动 API：
 
@@ -162,17 +162,18 @@ docker compose --profile observability up -d --wait
 ## 验证与演练
 
 ```sh
-make verify                # 重建 9 个测试数据库，跑 race 测试 + API/Worker/gRPC Agent 真实 E2E
+make verify                # 重建 9 个测试数据库，跑 race 测试 + API/Worker/gRPC Agent 真实 E2E（Kafka）
 make verify-observability  # Collector→Tempo 真实查询到 API/Worker traces
 make fault-drill           # broker 宕机、ack 窗口崩溃、毒消息、Redis 降级、worker 中断接管
-make loadtest              # 固定 seed 的详情读/点赞突发/backlog 恢复 smoke
+make loadtest              # 固定 seed 的详情读/点赞突发/backlog 恢复 smoke（SEA_EVENT_BROKER 可选 kafka/rocketmq）
+make queue-benchmark       # 同一负载参数分别执行 Kafka 与 RocketMQ，保存 JSON/Prometheus 证据
 make benchmark             # k6 constant-arrival-rate 正式压测，不可变归档 + SHA256SUMS
 make final-verify          # 从空白数据卷重放全部验证流程（会先删除本项目本地数据）
 ```
 
-性能工作流在真实 PostgreSQL、Redis、Kafka、SeaweedFS、API 与 Worker 上依次执行全部 A/B 对照组；阈值失败会先上传完整归档再阻断 CI。主分支或定时任务通过后，机器人会更新上方 README 指标表；PR 只验证并展示 Job Summary，不回写分支。
+性能工作流在真实 PostgreSQL、Redis、Kafka、SeaweedFS、API 与 Worker 上执行 HTTP A/B 对照；队列工作流在同一 loadtest 口径下分别运行 Kafka 与 RocketMQ 并上传每次 JSON/Prometheus 证据。阈值失败会先上传完整归档再阻断 CI。主分支或定时任务通过后，机器人只更新 HTTP 基准表；队列比较仅在完成足够的相同环境实测后手动更新，避免跨 runner 误归因。
 
-`make verify` 的 E2E 覆盖完整业务纵切：注册登录真实用户 → 生成真实 MP4 → S3 直传与校验 → Outbox→Kafka→Inbox → ffprobe/ffmpeg → 审核发布 → 签名播放 URL 探测 → 社交/发现 → 撤稿过滤 → 漂移修复 → token 重放撤销 → 限流断言。
+`make verify` 的 E2E 覆盖完整业务纵切：注册登录真实用户 → 生成真实 MP4 → S3 直传与校验 → Outbox→Kafka→Inbox → ffprobe/ffmpeg → 审核发布 → 签名播放 URL 探测 → 社交/发现 → 撤稿过滤 → 漂移修复 → token 重放撤销 → 限流断言。RocketMQ 适配器以同一 `events.Publisher` / `events.Consumer` 契约接入：发送成功才确认 Outbox，消费成功或事务性 quarantine 后才 ack；其运行时验证和性能证据由 `queue-benchmark` CI 收集。
 
 ## API 概览
 
@@ -229,7 +230,10 @@ openspec/                 # spec-driven 开发过程材料
 | `SEA_AUTH_TOKEN_KEY` | 空 | token 签名密钥，至少 32 字节 |
 | `SEA_DATABASE_URL` / `SEA_REDIS_URL` | 本地 compose 地址 | 必需依赖 |
 | `SEA_S3_ENDPOINT` / `SEA_S3_BUCKET` / `SEA_S3_ACCESS_KEY` / `SEA_S3_SECRET_KEY` | 本地 SeaweedFS | 对象存储 |
-| `SEA_KAFKA_BROKERS` | `127.0.0.1:29092` | API 的可选 readiness 依赖（写请求仍原子进 Outbox） |
+| `SEA_EVENT_BROKER` | `kafka` | 事件传输实现：`kafka` 或 `rocketmq`；两者共享 Outbox/Inbox/DLQ 语义 |
+| `SEA_KAFKA_BROKERS` | `127.0.0.1:29092` | Kafka bootstrap servers（仅 `SEA_EVENT_BROKER=kafka`） |
+| `SEA_ROCKETMQ_ENDPOINT` | `127.0.0.1:28081` | RocketMQ Proxy endpoint（仅 `SEA_EVENT_BROKER=rocketmq`，恰好一个） |
+| `SEA_ROCKETMQ_ACCESS_KEY` / `..._ACCESS_SECRET` | 空 | RocketMQ session credentials；本地 Proxy 可为空 |
 | `SEA_HTTP_ADDRESS` | `:8080` | 监听地址 |
 | `SEA_OTEL_EXPORTER_OTLP_ENDPOINT` | 空 | 设置后导出 traces |
 | `SEA_S3_DISABLE_DOWNLOAD_CACHE` | `false` | 签名 URL 缓存一键回退开关（A/B 用） |

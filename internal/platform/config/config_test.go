@@ -175,6 +175,33 @@ func TestLoadParsesDownloadURLCacheSwitch(t *testing.T) {
 	}
 }
 
+func TestLoadSelectsRocketMQBroker(t *testing.T) {
+	values := map[string]string{
+		"SEA_AUTH_TOKEN_KEY":         strings.Repeat("k", 32),
+		"SEA_EVENT_BROKER":           "rocketmq",
+		"SEA_ROCKETMQ_ENDPOINT":      "127.0.0.1:8081",
+		"SEA_ROCKETMQ_ACCESS_KEY":    "access",
+		"SEA_ROCKETMQ_ACCESS_SECRET": "secret",
+	}
+	cfg, err := config.LoadFrom(mapLookup(values))
+	if err != nil {
+		t.Fatalf("LoadFrom() error = %v", err)
+	}
+	if cfg.Broker.Driver != "rocketmq" || len(cfg.Broker.Brokers) != 1 || cfg.Broker.Brokers[0] != "127.0.0.1:8081" {
+		t.Fatalf("Broker = %+v", cfg.Broker)
+	}
+}
+
+func TestLoadRejectsUnknownEventBroker(t *testing.T) {
+	_, err := config.LoadFrom(mapLookup(map[string]string{
+		"SEA_AUTH_TOKEN_KEY": strings.Repeat("k", 32),
+		"SEA_EVENT_BROKER":   "unknown",
+	}))
+	if err == nil || !strings.Contains(err.Error(), "SEA_EVENT_BROKER") {
+		t.Fatalf("LoadFrom() error = %v, want SEA_EVENT_BROKER validation", err)
+	}
+}
+
 func mapLookup(values map[string]string) config.LookupEnv {
 	return func(key string) (string, bool) {
 		value, ok := values[key]

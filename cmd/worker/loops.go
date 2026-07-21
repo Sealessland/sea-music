@@ -16,7 +16,7 @@ import (
 	"github.com/sealessland/sea-music/internal/video"
 )
 
-func runHotLoop(ctx context.Context, consumer *events.KafkaConsumer, projector *discovery.HotProjector, logger *slog.Logger) {
+func runHotLoop(ctx context.Context, consumer events.Consumer, projector *discovery.HotProjector, logger *slog.Logger) {
 	handler := func(ctx context.Context, transaction *sql.Tx, envelope events.Envelope) error {
 		return projector.Handle(ctx, transaction, discovery.EngagementEvent{ID: envelope.ID, Type: envelope.Type, OccurredAt: envelope.OccurredAt, Data: envelope.Data})
 	}
@@ -33,7 +33,7 @@ func runHotLoop(ctx context.Context, consumer *events.KafkaConsumer, projector *
 	}
 }
 
-func runModerationConsumerLoop(ctx context.Context, consumer *events.KafkaConsumer, logger *slog.Logger) {
+func runModerationConsumerLoop(ctx context.Context, consumer events.Consumer, logger *slog.Logger) {
 	handler := func(ctx context.Context, transaction *sql.Tx, envelope events.Envelope) error {
 		if envelope.Type != "video.ready_for_moderation" {
 			return nil
@@ -117,7 +117,7 @@ func runQueuedActivationLoop(ctx context.Context, repository *video.PostgresRepo
 	}
 }
 
-func runCounterLoop(ctx context.Context, consumer *events.KafkaConsumer, projector *social.CounterProjector, logger *slog.Logger) {
+func runCounterLoop(ctx context.Context, consumer events.Consumer, projector *social.CounterProjector, logger *slog.Logger) {
 	handler := func(ctx context.Context, transaction *sql.Tx, envelope events.Envelope) error {
 		return projector.Handle(ctx, transaction, social.CounterEvent{ID: envelope.ID, Type: envelope.Type, Data: envelope.Data})
 	}
@@ -134,7 +134,7 @@ func runCounterLoop(ctx context.Context, consumer *events.KafkaConsumer, project
 	}
 }
 
-func runConsumerLoop(ctx context.Context, consumer *events.KafkaConsumer, logger *slog.Logger) {
+func runConsumerLoop(ctx context.Context, consumer events.Consumer, logger *slog.Logger) {
 	handler := func(ctx context.Context, transaction *sql.Tx, envelope events.Envelope) error {
 		if envelope.Type != "video.source_finalized" {
 			return nil
@@ -193,6 +193,9 @@ func runEventLoop(ctx context.Context, dispatcher *events.Dispatcher, pollInterv
 		} else if count > 0 {
 			logger.InfoContext(ctx, "outbox batch dispatched", "events", count)
 		}
+		if shouldImmediatelyDispatchAgain(count, err) {
+			continue
+		}
 		timer := time.NewTimer(pollInterval)
 		select {
 		case <-ctx.Done():
@@ -201,4 +204,7 @@ func runEventLoop(ctx context.Context, dispatcher *events.Dispatcher, pollInterv
 		case <-timer.C:
 		}
 	}
+}
+func shouldImmediatelyDispatchAgain(dispatched int, err error) bool {
+	return err == nil && dispatched > 0
 }

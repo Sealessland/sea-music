@@ -97,13 +97,14 @@ func run() error {
 	processor := video.NewFFmpegProcessor(store, cfg.Worker.FFprobePath, cfg.Worker.FFmpegPath, cfg.Worker.MediaTimeout, cfg.ObjectStore.MaxUploadBytes)
 	service := video.NewProcessingService(repository, processor, workerID, cfg.Worker.LeaseDuration)
 
-	publisher, err := events.NewKafkaPublisher(cfg.Broker.Brokers)
+	brokerConfig := eventBrokerConfig(cfg)
+	publisher, err := events.NewPublisher(brokerConfig, "domain-events")
 	if err != nil {
 		return err
 	}
 	defer publisher.Close()
 	if err := publisher.Ping(ctx); err != nil {
-		return fmt.Errorf("ping Kafka broker: %w", err)
+		return fmt.Errorf("ping %s broker: %w", cfg.Broker.Driver, err)
 	}
 	dispatcher := events.NewDispatcher(eventRepository, publisher, workerID, cfg.Events.BatchSize, cfg.Events.LeaseDuration)
 
@@ -121,32 +122,32 @@ func run() error {
 		return fmt.Errorf("ping worker Redis: %w", err)
 	}
 
-	eventConsumer, err := events.NewKafkaConsumer(events.ConsumerConfig{
-		Brokers: cfg.Broker.Brokers, Topic: "domain-events", Group: "sea-music-media-processing-v1",
+	eventConsumer, err := events.NewConsumer(brokerConfig, events.ConsumerConfig{
+		Topic: "domain-events", Group: "sea-music-media-processing-v1",
 		Name: "media-job-activation", MaxAttempts: 5, BaseBackoff: 100 * time.Millisecond,
 	}, events.NewInbox(database), events.NewPostgresRepository(database))
 	if err != nil {
 		return err
 	}
 	defer eventConsumer.Close()
-	counterConsumer, err := events.NewKafkaConsumer(events.ConsumerConfig{
-		Brokers: cfg.Broker.Brokers, Topic: "domain-events", Group: "sea-music-social-counters-v1",
+	counterConsumer, err := events.NewConsumer(brokerConfig, events.ConsumerConfig{
+		Topic: "domain-events", Group: "sea-music-social-counters-v1",
 		Name: "social-counters", MaxAttempts: 5, BaseBackoff: 100 * time.Millisecond,
 	}, events.NewInbox(database), events.NewPostgresRepository(database))
 	if err != nil {
 		return err
 	}
 	defer counterConsumer.Close()
-	hotConsumer, err := events.NewKafkaConsumer(events.ConsumerConfig{
-		Brokers: cfg.Broker.Brokers, Topic: "domain-events", Group: "sea-music-hot-ranking-v1",
+	hotConsumer, err := events.NewConsumer(brokerConfig, events.ConsumerConfig{
+		Topic: "domain-events", Group: "sea-music-hot-ranking-v1",
 		Name: "hot-ranking", MaxAttempts: 5, BaseBackoff: 100 * time.Millisecond,
 	}, events.NewInbox(database), events.NewPostgresRepository(database))
 	if err != nil {
 		return err
 	}
 	defer hotConsumer.Close()
-	moderationConsumer, err := events.NewKafkaConsumer(events.ConsumerConfig{
-		Brokers: cfg.Broker.Brokers, Topic: "domain-events", Group: "sea-music-moderation-dispatch-v1",
+	moderationConsumer, err := events.NewConsumer(brokerConfig, events.ConsumerConfig{
+		Topic: "domain-events", Group: "sea-music-moderation-dispatch-v1",
 		Name: "moderation-dispatch", MaxAttempts: 5, BaseBackoff: 100 * time.Millisecond,
 	}, events.NewInbox(database), eventRepository)
 	if err != nil {

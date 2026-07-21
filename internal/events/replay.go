@@ -18,10 +18,10 @@ var (
 
 type ReplayService struct {
 	repository *PostgresRepository
-	publisher  *KafkaPublisher
+	publisher  Publisher
 }
 
-func NewReplayService(repository *PostgresRepository, publisher *KafkaPublisher) *ReplayService {
+func NewReplayService(repository *PostgresRepository, publisher Publisher) *ReplayService {
 	return &ReplayService{repository: repository, publisher: publisher}
 }
 

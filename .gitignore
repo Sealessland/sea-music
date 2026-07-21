@@ -15,6 +15,7 @@
 
 # Generated runtime evidence (regenerable via make benchmark / make loadtest)
 artifacts/benchmarks/
+artifacts/queue-benchmarks/
 
 # Build outputs
 bin/

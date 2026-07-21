@@ -1,3 +1,10 @@
+# 消息队列对比
+
+Kafka 与 RocketMQ 的可比较数据由 `make queue-benchmark` 生成：每个 broker 运行相同数量的 `burst-like-toggle` 请求、并发和固定 seed 数据集；记录写路径吞吐、P95/P99、Outbox 全状态恢复时间、错误数及对应 Prometheus 快照。每次运行保存在 `artifacts/queue-benchmarks/<run-id>/`，含 JSON、`SHA256SUMS` 和环境清单；GitHub Actions 保存 14 天 artifact 并在 Job Summary 中显示中位数。
+
+RocketMQ 使用其 Proxy（`SEA_ROCKETMQ_ENDPOINT`），Kafka 使用 bootstrap server。它们的协议、分区/队列模型和运行时开销不同，因此仅可比较同一个 runner、同一提交、同一参数的成对结果；不能把历史 Kafka 数据外推为 RocketMQ 结果。当前没有已验证的 RocketMQ 数字。
+
+
 # 固定环境性能基线与优化
 
 > 历史口径说明：本页的 `2998 -> 3645 RPS（+21.6%）` 来自固定并发、

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"strings"
 	"time"
 )
 
@@ -117,7 +116,12 @@ func defaults(lookup LookupEnv) Config {
 			FFprobePath:               valueOrDefault(lookup, "SEA_FFPROBE_PATH", "ffprobe"),
 			FFmpegPath:                valueOrDefault(lookup, "SEA_FFMPEG_PATH", "ffmpeg"),
 		},
-		Broker:    Broker{Brokers: strings.Split(valueOrDefault(lookup, "SEA_KAFKA_BROKERS", "127.0.0.1:29092"), ",")},
+		Broker: Broker{
+			Driver:       valueOrDefault(lookup, "SEA_EVENT_BROKER", "kafka"),
+			Brokers:      brokerEndpoints(lookup),
+			AccessKey:    valueOrDefault(lookup, "SEA_ROCKETMQ_ACCESS_KEY", ""),
+			AccessSecret: valueOrDefault(lookup, "SEA_ROCKETMQ_ACCESS_SECRET", ""),
+		},
 		Events:    Events{PollInterval: 500 * time.Millisecond, LeaseDuration: time.Minute, BatchSize: 100},
 		Social:    Social{ReconcileInterval: time.Minute, ReconcileBatch: 100},
 		Telemetry: Telemetry{OTLPEndpoint: valueOrDefault(lookup, "SEA_OTEL_EXPORTER_OTLP_ENDPOINT", "")},
@@ -155,4 +159,11 @@ func defaults(lookup LookupEnv) Config {
 			RejectThreshold:   0.95,
 		},
 	}
+}
+
+func brokerEndpoints(lookup LookupEnv) []string {
+	if valueOrDefault(lookup, "SEA_EVENT_BROKER", "kafka") == "rocketmq" {
+		return splitNonEmpty(valueOrDefault(lookup, "SEA_ROCKETMQ_ENDPOINT", "127.0.0.1:28081"))
+	}
+	return splitNonEmpty(valueOrDefault(lookup, "SEA_KAFKA_BROKERS", "127.0.0.1:29092"))
 }

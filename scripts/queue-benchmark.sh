@@ -21,6 +21,7 @@ while [ "$repeat" -le "$REPEATS" ]; do
     for broker in kafka rocketmq jetstream; do
         mkdir -p "$RUN_DIR/$broker"
         result="$RUN_DIR/$broker/run-$repeat.json"
+        docker compose --profile rocketmq --profile jetstream stop broker rocketmq-init rocketmq-broker rocketmq-nameserver jetstream >/dev/null 2>&1 || true
         SEA_EVENT_BROKER="$broker" \
         SEA_LOAD_OUTPUT_DIR="$RUN_DIR/$broker" \
         SEA_LOAD_HTTP_ADDRESS="127.0.0.1:$((38100 + repeat))" \

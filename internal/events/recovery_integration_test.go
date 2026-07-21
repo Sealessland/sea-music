@@ -45,8 +45,8 @@ func TestAckWindowCrashRepublishesStableIDAndInboxDeduplicates(t *testing.T) {
 	if err != nil || stats.Pending != 0 || stats.Publishing != 0 {
 		t.Fatalf("recovered backlog = (%+v, %v)", stats, err)
 	}
-	consumer, err := events.NewKafkaConsumer(events.ConsumerConfig{
-		Brokers: []string{broker}, Topic: topic, Group: topic + "-group", Name: "dedupe-projection",
+	consumer, err := events.NewKafkaConsumer([]string{broker}, events.ConsumerConfig{
+		Topic: topic, Group: topic + "-group", Name: "dedupe-projection",
 		MaxAttempts: 2, BaseBackoff: time.Millisecond,
 	}, events.NewInbox(database), repository)
 	if err != nil {

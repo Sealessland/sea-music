@@ -9,4 +9,4 @@
 
 ## 原因与后果
 
-数据库提交和 Kafka 发布无法组成普通原子事务。Outbox 消除“业务成功但事件丢失”，Inbox 消除重复投递的重复副作用。系统提供至少一次投递和业务幂等，不声称端到端恰好一次；需要监控 backlog、失败数和最老事件年龄。
+数据库提交和外部消息 broker 发布无法组成普通原子事务。Outbox 消除“业务成功但事件丢失”，Inbox 消除重复投递的重复副作用。Kafka、RocketMQ 与 NATS JetStream 通过同一 `Publisher` / `Consumer` 契约接入，共享 Outbox、Inbox、重试与 DLQ 语义；系统提供至少一次投递和业务幂等，不声称端到端恰好一次。

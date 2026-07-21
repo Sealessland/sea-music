@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -12,7 +13,21 @@ import (
 	"github.com/apache/rocketmq-clients/golang/v5/credentials"
 )
 
-const rocketMQInvisibleDuration = 30 * time.Second
+var (
+	_ Publisher = (*RocketMQPublisher)(nil)
+	_ Consumer  = (*RocketMQConsumer)(nil)
+)
+
+const (
+	rocketMQFetchWait         = 30 * time.Second
+	rocketMQInvisibleDuration = 30 * time.Second
+)
+
+var rocketMQTopicPart = strings.NewReplacer(".", "_")
+
+func rocketMQTopic(topic string) string {
+	return rocketMQTopicPart.Replace(topic)
+}
 
 type rocketMQMessage interface {
 	Body() []byte
@@ -72,7 +87,7 @@ func newRocketMQSimpleConsumer(endpoint, accessKey, accessSecret, topic, group s
 	rmq.EnableSsl = false
 	consumer, err := rmq.NewSimpleConsumer(
 		rocketMQConfig(endpoint, accessKey, accessSecret, group),
-		rmq.WithSimpleAwaitDuration(time.Second),
+		rmq.WithSimpleAwaitDuration(rocketMQFetchWait),
 		rmq.WithSimpleSubscriptionExpressions(map[string]*rmq.FilterExpression{topic: rmq.SUB_ALL}),
 	)
 	if err != nil {
@@ -84,6 +99,7 @@ func newRocketMQSimpleConsumer(endpoint, accessKey, accessSecret, topic, group s
 	return &rocketMQConsumerClient{consumer: consumer}, nil
 }
 
+// RocketMQPublisher maps the broker-independent Publisher contract to RocketMQ messages.
 type RocketMQPublisher struct {
 	endpoint string
 	producer rmq.Producer
@@ -94,7 +110,11 @@ func NewRocketMQPublisher(endpoint, accessKey, accessSecret string, topics []str
 		return nil, errors.New("RocketMQ endpoint and at least one topic are required")
 	}
 	rmq.EnableSsl = false
-	producer, err := rmq.NewProducer(rocketMQConfig(endpoint, accessKey, accessSecret, ""), rmq.WithTopics(topics...))
+	mappedTopics := make([]string, len(topics))
+	for index, topic := range topics {
+		mappedTopics[index] = rocketMQTopic(topic)
+	}
+	producer, err := rmq.NewProducer(rocketMQConfig(endpoint, accessKey, accessSecret, ""), rmq.WithTopics(mappedTopics...))
 	if err != nil {
 		return nil, fmt.Errorf("create RocketMQ producer: %w", err)
 	}
@@ -109,7 +129,7 @@ func (publisher *RocketMQPublisher) Publish(ctx context.Context, event OutboxEve
 	if err != nil {
 		return err
 	}
-	message := &rmq.Message{Topic: event.Topic, Body: value}
+	message := &rmq.Message{Topic: rocketMQTopic(event.Topic), Body: value}
 	message.SetKeys(event.Envelope.ID, event.Envelope.AggregateID)
 	message.AddProperty("event_type", event.Envelope.Type)
 	message.AddProperty("traceparent", event.Envelope.TraceParent)
@@ -130,4 +150,55 @@ func (publisher *RocketMQPublisher) Ping(ctx context.Context) error {
 
 func (publisher *RocketMQPublisher) Close() {
 	_ = publisher.producer.GracefulStop()
+}
+
+// RocketMQConsumer maps RocketMQ invisibility acknowledgements to the shared
+// Consumer contract. An acknowledgement follows Inbox processing or DLQ write.
+type RocketMQConsumer struct {
+	client  rocketMQSimpleConsumer
+	runtime consumerRuntime
+}
+
+func NewRocketMQConsumer(endpoint, accessKey, accessSecret string, config ConsumerConfig, inbox *Inbox, repository *PostgresRepository) (*RocketMQConsumer, error) {
+	runtime, err := newConsumerRuntime(config, inbox, repository)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(endpoint) == "" {
+		return nil, errors.New("RocketMQ endpoint is required")
+	}
+	client, err := newRocketMQSimpleConsumer(endpoint, accessKey, accessSecret, rocketMQTopic(config.Topic), config.Group)
+	if err != nil {
+		return nil, err
+	}
+	return &RocketMQConsumer{client: client, runtime: runtime}, nil
+}
+
+func (consumer *RocketMQConsumer) RunOnce(ctx context.Context, handler InboxHandler) (bool, error) {
+	messages, err := consumer.client.Receive(ctx, 1, rocketMQInvisibleDuration)
+	if err != nil {
+		if ctx.Err() != nil {
+			return false, ctx.Err()
+		}
+		return false, err
+	}
+	if len(messages) == 0 {
+		return false, nil
+	}
+	message := messages[0]
+	var envelope Envelope
+	if err := json.Unmarshal(message.Body(), &envelope); err != nil {
+		return false, fmt.Errorf("decode consumed envelope: %w", err)
+	}
+	if err := consumer.runtime.process(ctx, consumer.runtime.config.Topic, envelope, handler); err != nil {
+		return false, err
+	}
+	if err := consumer.client.Ack(ctx, message); err != nil {
+		return false, fmt.Errorf("acknowledge RocketMQ message: %w", err)
+	}
+	return true, nil
+}
+
+func (consumer *RocketMQConsumer) Close() {
+	_ = consumer.client.Close()
 }

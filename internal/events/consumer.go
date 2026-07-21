@@ -8,13 +8,11 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/twmb/franz-go/pkg/kgo"
-	"github.com/twmb/franz-go/plugin/kotel"
 )
 
+// ConsumerConfig defines broker-independent processing semantics. Broker
+// endpoints and credentials belong to BrokerConfig, not this type.
 type ConsumerConfig struct {
-	Brokers     []string
 	Topic       string
 	Group       string
 	Name        string
@@ -22,164 +20,55 @@ type ConsumerConfig struct {
 	BaseBackoff time.Duration
 }
 
-// Consumer receives one event at a time and acknowledges it only after its inbox transaction or quarantine succeeds.
-type Consumer interface {
-	RunOnce(context.Context, InboxHandler) (bool, error)
-	Close()
-}
-
-type KafkaConsumer struct {
+// consumerRuntime owns the behavior every broker adapter must preserve:
+// validate, process through Inbox, retry, then transactionally quarantine.
+type consumerRuntime struct {
 	config     ConsumerConfig
-	client     *kgo.Client
 	inbox      *Inbox
 	repository *PostgresRepository
 }
 
-func NewKafkaConsumer(config ConsumerConfig, inbox *Inbox, repository *PostgresRepository) (*KafkaConsumer, error) {
-	if len(config.Brokers) == 0 || strings.TrimSpace(config.Topic) == "" || strings.TrimSpace(config.Group) == "" ||
-		strings.TrimSpace(config.Name) == "" || config.MaxAttempts <= 0 || config.BaseBackoff <= 0 || inbox == nil || repository == nil {
-		return nil, errors.New("invalid Kafka consumer configuration")
+func newConsumerRuntime(config ConsumerConfig, inbox *Inbox, repository *PostgresRepository) (consumerRuntime, error) {
+	if strings.TrimSpace(config.Topic) == "" || strings.TrimSpace(config.Group) == "" ||
+		strings.TrimSpace(config.Name) == "" || config.MaxAttempts <= 0 || config.BaseBackoff <= 0 ||
+		inbox == nil || repository == nil {
+		return consumerRuntime{}, errors.New("invalid event consumer configuration")
 	}
-	client, err := kgo.NewClient(
-		kgo.SeedBrokers(config.Brokers...),
-		kgo.ConsumeTopics(config.Topic),
-		kgo.ConsumerGroup(config.Group),
-		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
-		kgo.WithHooks(kotel.NewKotel(kotel.WithTracer(kotel.NewTracer(kotel.ConsumerGroup(config.Group)))).Hooks()...),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create Kafka consumer: %w", err)
-	}
-	return &KafkaConsumer{config: config, client: client, inbox: inbox, repository: repository}, nil
+	return consumerRuntime{config: config, inbox: inbox, repository: repository}, nil
 }
 
-func (consumer *KafkaConsumer) RunOnce(ctx context.Context, handler InboxHandler) (bool, error) {
-	records := consumer.client.PollRecords(ctx, 1)
-	if err := records.Err(); err != nil {
-		return false, err
-	}
-	all := records.Records()
-	if len(all) == 0 {
-		return false, nil
-	}
-	record := all[0]
-	processContext := record.Context
-	if processContext == nil {
-		processContext = ctx
-	}
-	var envelope Envelope
-	if err := json.Unmarshal(record.Value, &envelope); err != nil {
-		return false, fmt.Errorf("decode consumed envelope: %w", err)
-	}
+func (runtime consumerRuntime) process(ctx context.Context, originalTopic string, envelope Envelope, handler InboxHandler) error {
 	if err := envelope.Validate(); err != nil {
-		return false, err
+		return err
 	}
 	var lastErr error
-	for attempt := 1; attempt <= consumer.config.MaxAttempts; attempt++ {
-		_, err := consumer.inbox.Process(processContext, consumer.config.Name, envelope, handler)
-		if err == nil {
-			if err := consumer.client.CommitRecords(ctx, record); err != nil {
-				return false, fmt.Errorf("commit Kafka record: %w", err)
-			}
-			return true, nil
+	for attempt := 1; attempt <= runtime.config.MaxAttempts; attempt++ {
+		if _, err := runtime.inbox.Process(ctx, runtime.config.Name, envelope, handler); err == nil {
+			return nil
+		} else {
+			lastErr = err
 		}
-		lastErr = err
-		if attempt < consumer.config.MaxAttempts {
-			timer := time.NewTimer(consumer.config.BaseBackoff << min(attempt-1, 8))
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return false, ctx.Err()
-			case <-timer.C:
+		if attempt < runtime.config.MaxAttempts {
+			if err := waitForRetry(ctx, runtime.config.BaseBackoff<<min(attempt-1, 8)); err != nil {
+				return err
 			}
 		}
 	}
-	if err := consumer.repository.Quarantine(ctx, consumer.config.Name, record.Topic, envelope, consumer.config.MaxAttempts, lastErr); err != nil {
-		return false, errors.Join(lastErr, err)
+	if err := runtime.repository.Quarantine(ctx, runtime.config.Name, originalTopic, envelope, runtime.config.MaxAttempts, lastErr); err != nil {
+		return errors.Join(lastErr, err)
 	}
-	if err := consumer.client.CommitRecords(ctx, record); err != nil {
-		return false, fmt.Errorf("commit quarantined Kafka record: %w", err)
-	}
-	return true, nil
+	return nil
 }
 
-// NewRocketMQConsumer creates and starts a RocketMQ 5 simple consumer. A message remains invisible until RunOnce acknowledges it after the inbox transaction or quarantine succeeds.
-func NewRocketMQConsumer(endpoint, accessKey, accessSecret string, config ConsumerConfig, inbox *Inbox, repository *PostgresRepository) (*RocketMQConsumer, error) {
-	if strings.TrimSpace(endpoint) == "" || strings.TrimSpace(config.Topic) == "" || strings.TrimSpace(config.Group) == "" ||
-		strings.TrimSpace(config.Name) == "" || config.MaxAttempts <= 0 || config.BaseBackoff <= 0 || inbox == nil || repository == nil {
-		return nil, errors.New("invalid RocketMQ consumer configuration")
+func waitForRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
-	consumer, err := newRocketMQSimpleConsumer(endpoint, accessKey, accessSecret, config.Topic, config.Group)
-	if err != nil {
-		return nil, err
-	}
-	return &RocketMQConsumer{config: config, client: consumer, inbox: inbox, repository: repository}, nil
-}
-
-// RocketMQConsumer maps RocketMQ's invisible-message acknowledgement to the existing Inbox/DLQ transaction boundary.
-type RocketMQConsumer struct {
-	config     ConsumerConfig
-	client     rocketMQSimpleConsumer
-	inbox      *Inbox
-	repository *PostgresRepository
-}
-
-// RunOnce receives at most one RocketMQ message, retries its transaction, then acknowledges it only after success or quarantine.
-func (consumer *RocketMQConsumer) RunOnce(ctx context.Context, handler InboxHandler) (bool, error) {
-	messages, err := consumer.client.Receive(ctx, 1, rocketMQInvisibleDuration)
-	if err != nil {
-		if ctx.Err() != nil {
-			return false, ctx.Err()
-		}
-		return false, err
-	}
-	if len(messages) == 0 {
-		return false, nil
-	}
-	message := messages[0]
-	var envelope Envelope
-	if err := json.Unmarshal(message.Body(), &envelope); err != nil {
-		return false, fmt.Errorf("decode consumed envelope: %w", err)
-	}
-	if err := envelope.Validate(); err != nil {
-		return false, err
-	}
-	var lastErr error
-	for attempt := 1; attempt <= consumer.config.MaxAttempts; attempt++ {
-		_, err := consumer.inbox.Process(ctx, consumer.config.Name, envelope, handler)
-		if err == nil {
-			if err := consumer.client.Ack(ctx, message); err != nil {
-				return false, fmt.Errorf("acknowledge RocketMQ message: %w", err)
-			}
-			return true, nil
-		}
-		lastErr = err
-		if attempt < consumer.config.MaxAttempts {
-			timer := time.NewTimer(consumer.config.BaseBackoff << min(attempt-1, 8))
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return false, ctx.Err()
-			case <-timer.C:
-			}
-		}
-	}
-	if err := consumer.repository.Quarantine(ctx, consumer.config.Name, consumer.config.Topic, envelope, consumer.config.MaxAttempts, lastErr); err != nil {
-		return false, errors.Join(lastErr, err)
-	}
-	if err := consumer.client.Ack(ctx, message); err != nil {
-		return false, fmt.Errorf("acknowledge quarantined RocketMQ message: %w", err)
-	}
-	return true, nil
-}
-
-// Close stops the RocketMQ consumer and releases its client resources.
-func (consumer *RocketMQConsumer) Close() {
-	_ = consumer.client.Close()
-}
-
-func (consumer *KafkaConsumer) Close() {
-	consumer.client.Close()
 }
 
 func (repository *PostgresRepository) Quarantine(ctx context.Context, consumerName, originalTopic string, envelope Envelope, attempts int, cause error) error {

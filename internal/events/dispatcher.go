@@ -7,9 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/twmb/franz-go/pkg/kgo"
-	"github.com/twmb/franz-go/plugin/kotel"
 )
 
 type OutboxEvent struct {
@@ -141,66 +138,6 @@ func (repository *PostgresRepository) FailDelivery(ctx context.Context, event Ou
 		return errors.New("outbox delivery lease lost")
 	}
 	return nil
-}
-
-// Publisher delivers an outbox event and reports broker reachability. Successful Publish calls are durable broker acknowledgements.
-type Publisher interface {
-	Publish(context.Context, OutboxEvent) error
-	Ping(context.Context) error
-	Close()
-}
-
-type KafkaPublisher struct {
-	client *kgo.Client
-}
-
-func NewKafkaPublisher(brokers []string) (*KafkaPublisher, error) {
-	if len(brokers) == 0 {
-		return nil, errors.New("at least one Kafka broker is required")
-	}
-	client, err := kgo.NewClient(
-		kgo.SeedBrokers(brokers...),
-		kgo.AllowAutoTopicCreation(),
-		kgo.UnknownTopicRetries(-1),
-		kgo.WithHooks(kotel.NewKotel(kotel.WithTracer(kotel.NewTracer())).Hooks()...),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create Kafka producer: %w", err)
-	}
-	return &KafkaPublisher{client: client}, nil
-}
-
-func encodeEnvelope(envelope Envelope) ([]byte, error) {
-	value, err := json.Marshal(envelope)
-	if err != nil {
-		return nil, fmt.Errorf("encode event envelope: %w", err)
-	}
-	return value, nil
-}
-
-func (publisher *KafkaPublisher) Publish(ctx context.Context, event OutboxEvent) error {
-	value, err := encodeEnvelope(event.Envelope)
-	if err != nil {
-		return err
-	}
-	headers := []kgo.RecordHeader{
-		{Key: "event_id", Value: []byte(event.Envelope.ID)},
-		{Key: "event_type", Value: []byte(event.Envelope.Type)},
-		{Key: "traceparent", Value: []byte(event.Envelope.TraceParent)},
-	}
-	record := &kgo.Record{Topic: event.Topic, Key: []byte(event.Envelope.AggregateID), Value: value, Headers: headers, Timestamp: event.Envelope.OccurredAt}
-	if err := publisher.client.ProduceSync(ctx, record).FirstErr(); err != nil {
-		return fmt.Errorf("Kafka publish acknowledgement: %w", err)
-	}
-	return nil
-}
-
-func (publisher *KafkaPublisher) Ping(ctx context.Context) error {
-	return publisher.client.Ping(ctx)
-}
-
-func (publisher *KafkaPublisher) Close() {
-	publisher.client.Close()
 }
 
 type Dispatcher struct {

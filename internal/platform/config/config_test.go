@@ -187,7 +187,22 @@ func TestLoadSelectsRocketMQBroker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFrom() error = %v", err)
 	}
-	if cfg.Broker.Driver != "rocketmq" || len(cfg.Broker.Brokers) != 1 || cfg.Broker.Brokers[0] != "127.0.0.1:8081" {
+	if cfg.Broker.Driver != "rocketmq" || len(cfg.Broker.Endpoints) != 1 || cfg.Broker.Endpoints[0] != "127.0.0.1:8081" {
+		t.Fatalf("Broker = %+v", cfg.Broker)
+	}
+}
+
+func TestLoadSelectsJetStreamBroker(t *testing.T) {
+	values := map[string]string{
+		"SEA_AUTH_TOKEN_KEY": strings.Repeat("k", 32),
+		"SEA_EVENT_BROKER":   "jetstream",
+		"SEA_NATS_URL":       "nats://127.0.0.1:4222",
+	}
+	cfg, err := config.LoadFrom(mapLookup(values))
+	if err != nil {
+		t.Fatalf("LoadFrom() error = %v", err)
+	}
+	if cfg.Broker.Driver != "jetstream" || len(cfg.Broker.Endpoints) != 1 || cfg.Broker.Endpoints[0] != "nats://127.0.0.1:4222" {
 		t.Fatalf("Broker = %+v", cfg.Broker)
 	}
 }

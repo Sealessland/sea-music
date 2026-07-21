@@ -59,7 +59,7 @@ flowchart LR
     API --> Redis[(Redis)]
     API --> S3[(SeaweedFS S3)]
     PG --> Outbox[Transactional Outbox]
-    Outbox --> MQ{Kafka / RocketMQ}
+    Outbox --> MQ{Kafka / RocketMQ / JetStream}
     MQ --> Worker[Go Worker]
     Worker --> PG
     Worker --> S3
@@ -77,12 +77,14 @@ flowchart LR
 
 1. 客户端创建草稿，API 生成用户隔离的对象 key 和短期 S3 PUT 预签名 URL，客户端直传源文件。
 2. finalize 重新读取对象并核验长度、Content-Type 和 SHA-256，在**同一事务**中推进状态机、幂等入队转码任务并写 Outbox。
-3. Dispatcher 只有收到 Kafka ack 后才确认 Outbox 行；Worker 通过 Inbox 去重并领取带租约的处理任务。
-4. Worker 完成转码后，在同一事务写 `video.ready_for_moderation`；Kafka Inbox 幂等落本地 dispatch job，独立租约循环调用 gRPC Agent 并回收结果。
+3. Dispatcher 只有收到所选 broker 的持久化 ack 后才确认 Outbox 行；Worker 通过统一 `events.Consumer` 接口消费，并用 Inbox 去重。
+4. Worker 完成转码后，在同一事务写 `video.ready_for_moderation`；消费端在 Inbox 事务中幂等落本地 dispatch job，独立租约循环调用 gRPC Agent 并回收结果。
 5. Agent 先由 reviewer 生成结构化候选证据，再由独立 critic 反证；确定性策略引擎要求 verdict 一致且达到配置阈值，否则升级人工。默认 shadow 模式和无 provider fallback 都不能改变视频状态，视频领域仍独占发布授权。
 6. 点赞/收藏/关注/评论/弹幕先写权威关系及 Outbox，消费者异步投影计数和热门分数；周期对账修复漂移。
 
 关键决策记录：[ADR 0001 模块化单体](docs/adr/0001-modular-monolith.md)、[ADR 0002 Transactional Outbox](docs/adr/0002-transactional-outbox.md)、[ADR 0003 直传与真实媒体处理](docs/adr/0003-direct-upload-media.md)。
+
+消息队列代码按阅读职责拆分：`internal/events/broker.go` 只定义契约和选择实现，`kafka.go` / `rocketmq.go` / `jetstream.go` 分别包含完整适配器，`dispatcher.go` / `consumer.go` 保留所有 broker 共享的 Outbox、Inbox、重试和 DLQ 语义。新增 MQ 时只增加适配器文件并在 `broker.go` 注册，不修改业务模块。
 
 ## 核心设计
 
@@ -132,7 +134,7 @@ flowchart LR
 make bootstrap
 ```
 
-该命令启动 PostgreSQL、Redis、SeaweedFS S3 API 和默认 Apache Kafka，应用数据库迁移，并装载固定 seed 的开发 fixture。RocketMQ 运行 `docker compose --profile rocketmq up -d --wait rocketmq-nameserver rocketmq-broker`；随后用 `SEA_EVENT_BROKER=rocketmq` 启动 API 和 Worker。
+该命令启动 PostgreSQL、Redis、SeaweedFS S3 API 和默认 Apache Kafka，应用数据库迁移，并装载固定 seed 的开发 fixture。RocketMQ 运行 `docker compose --profile rocketmq up -d --wait rocketmq-nameserver rocketmq-broker`；JetStream 运行 `docker compose --profile jetstream up -d --wait jetstream`。随后分别用 `SEA_EVENT_BROKER=rocketmq` 或 `SEA_EVENT_BROKER=jetstream` 启动 API 和 Worker。
 
 启动 API：
 
@@ -165,15 +167,15 @@ docker compose --profile observability up -d --wait
 make verify                # 重建 9 个测试数据库，跑 race 测试 + API/Worker/gRPC Agent 真实 E2E（Kafka）
 make verify-observability  # Collector→Tempo 真实查询到 API/Worker traces
 make fault-drill           # broker 宕机、ack 窗口崩溃、毒消息、Redis 降级、worker 中断接管
-make loadtest              # 固定 seed 的详情读/点赞突发/backlog 恢复 smoke（SEA_EVENT_BROKER 可选 kafka/rocketmq）
-make queue-benchmark       # 同一负载参数分别执行 Kafka 与 RocketMQ，保存 JSON/Prometheus 证据
+make loadtest              # 固定 seed 的详情读/点赞突发/backlog 恢复 smoke（broker 可选 kafka/rocketmq/jetstream）
+make queue-benchmark       # 同一负载参数执行 Kafka、RocketMQ、JetStream，保存 JSON/Prometheus 证据
 make benchmark             # k6 constant-arrival-rate 正式压测，不可变归档 + SHA256SUMS
 make final-verify          # 从空白数据卷重放全部验证流程（会先删除本项目本地数据）
 ```
 
-性能工作流在真实 PostgreSQL、Redis、Kafka、SeaweedFS、API 与 Worker 上执行 HTTP A/B 对照；队列工作流在同一 loadtest 口径下分别运行 Kafka 与 RocketMQ 并上传每次 JSON/Prometheus 证据。阈值失败会先上传完整归档再阻断 CI。主分支或定时任务通过后，机器人只更新 HTTP 基准表；队列比较仅在完成足够的相同环境实测后手动更新，避免跨 runner 误归因。
+性能工作流在真实 PostgreSQL、Redis、Kafka、SeaweedFS、API 与 Worker 上执行 HTTP A/B 对照；队列工作流在同一 loadtest 口径下分别运行 Kafka、RocketMQ 与 JetStream，并上传每次 JSON/Prometheus 证据。阈值失败会先上传完整归档再阻断 CI。主分支或定时任务通过后，机器人只更新 HTTP 基准表；队列比较仅在完成足够的相同环境实测后手动更新，避免跨 runner 误归因。
 
-`make verify` 的 E2E 覆盖完整业务纵切：注册登录真实用户 → 生成真实 MP4 → S3 直传与校验 → Outbox→Kafka→Inbox → ffprobe/ffmpeg → 审核发布 → 签名播放 URL 探测 → 社交/发现 → 撤稿过滤 → 漂移修复 → token 重放撤销 → 限流断言。RocketMQ 适配器以同一 `events.Publisher` / `events.Consumer` 契约接入：发送成功才确认 Outbox，消费成功或事务性 quarantine 后才 ack；其运行时验证和性能证据由 `queue-benchmark` CI 收集。
+`make verify` 的 E2E 覆盖完整业务纵切：注册登录真实用户 → 生成真实 MP4 → S3 直传与校验 → Outbox→Kafka→Inbox → ffprobe/ffmpeg → 审核发布 → 签名播放 URL 探测 → 社交/发现 → 撤稿过滤 → 漂移修复 → token 重放撤销 → 限流断言。三种 broker 均以同一 `events.Publisher` / `events.Consumer` 契约接入：发送成功才确认 Outbox，消费成功或事务性 quarantine 后才 ack；运行时验证和性能证据由 `queue-benchmark` CI 收集。
 
 ## API 概览
 
@@ -230,10 +232,11 @@ openspec/                 # spec-driven 开发过程材料
 | `SEA_AUTH_TOKEN_KEY` | 空 | token 签名密钥，至少 32 字节 |
 | `SEA_DATABASE_URL` / `SEA_REDIS_URL` | 本地 compose 地址 | 必需依赖 |
 | `SEA_S3_ENDPOINT` / `SEA_S3_BUCKET` / `SEA_S3_ACCESS_KEY` / `SEA_S3_SECRET_KEY` | 本地 SeaweedFS | 对象存储 |
-| `SEA_EVENT_BROKER` | `kafka` | 事件传输实现：`kafka` 或 `rocketmq`；两者共享 Outbox/Inbox/DLQ 语义 |
+| `SEA_EVENT_BROKER` | `kafka` | 事件传输实现：`kafka`、`rocketmq` 或 `jetstream`；共享 Outbox/Inbox/DLQ 语义 |
 | `SEA_KAFKA_BROKERS` | `127.0.0.1:29092` | Kafka bootstrap servers（仅 `SEA_EVENT_BROKER=kafka`） |
 | `SEA_ROCKETMQ_ENDPOINT` | `127.0.0.1:28081` | RocketMQ Proxy endpoint（仅 `SEA_EVENT_BROKER=rocketmq`，恰好一个） |
 | `SEA_ROCKETMQ_ACCESS_KEY` / `..._ACCESS_SECRET` | 空 | RocketMQ session credentials；本地 Proxy 可为空 |
+| `SEA_NATS_URL` | `nats://127.0.0.1:24222` | NATS server URL（仅 `SEA_EVENT_BROKER=jetstream`，恰好一个；stream 使用 file storage） |
 | `SEA_HTTP_ADDRESS` | `:8080` | 监听地址 |
 | `SEA_OTEL_EXPORTER_OTLP_ENDPOINT` | 空 | 设置后导出 traces |
 | `SEA_S3_DISABLE_DOWNLOAD_CACHE` | `false` | 签名 URL 缓存一键回退开关（A/B 用） |

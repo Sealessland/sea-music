@@ -27,8 +27,8 @@ func TestPoisonEventRetriesThenReachesRealDeadLetterTopic(t *testing.T) {
 		t.Fatalf("NewKafkaPublisher(): %v", err)
 	}
 	defer publisher.Close()
-	consumer, err := events.NewKafkaConsumer(events.ConsumerConfig{
-		Brokers: []string{broker}, Topic: topic, Group: topic + "-group",
+	consumer, err := events.NewKafkaConsumer([]string{broker}, events.ConsumerConfig{
+		Topic: topic, Group: topic + "-group",
 		Name: "poison-projection", MaxAttempts: 3, BaseBackoff: time.Millisecond,
 	}, events.NewInbox(database), events.NewPostgresRepository(database))
 	if err != nil {

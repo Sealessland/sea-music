@@ -71,8 +71,8 @@ func (service *ReplayService) Replay(ctx context.Context, deadLetterID, actorRol
 }
 
 // ReplayOutboxEvent resets a failed outbox event to pending so the dispatcher
-// naturally picks it up again. The API process never publishes to Kafka
-// itself; delivery stays with the outbox dispatcher.
+// naturally picks it up again. The API process never publishes directly to a
+// broker; delivery stays with the outbox dispatcher.
 func (service *ReplayService) ReplayOutboxEvent(ctx context.Context, eventID, actorRole string) error {
 	if actorRole != "admin" {
 		return ErrReplayForbidden

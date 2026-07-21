@@ -13,6 +13,7 @@ import (
 
 var safeTestDatabase = regexp.MustCompile(`^[a-z][a-z0-9_]*_test$`)
 
+// main resets the test database and reports any failure to standard error before exiting with status 1.
 func main() {
 	if err := run(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "testdb: %v\n", err)
@@ -20,6 +21,7 @@ func main() {
 	}
 }
 
+// run validates the admin URL and safe test database name, then within a 20-second timeout terminates existing connections, drops and recreates the database, and reports success to standard output.
 func run() error {
 	adminURL := os.Getenv("SEA_DATABASE_ADMIN_URL")
 	if adminURL == "" {

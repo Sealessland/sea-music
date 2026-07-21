@@ -21,15 +21,18 @@ type PostgresRepository struct {
 	outbox   OutboxWriter
 }
 
+// NewPostgresRepository creates a relation repository backed by database; outbox event delivery remains disabled until WithOutbox is called.
 func NewPostgresRepository(database *sql.DB) *PostgresRepository {
 	return &PostgresRepository{database: database}
 }
 
+// WithOutbox sets the writer used to enqueue relation-change events in the same transaction and returns the repository for chaining.
 func (repository *PostgresRepository) WithOutbox(writer OutboxWriter) *PostgresRepository {
 	repository.outbox = writer
 	return repository
 }
 
+// SetLike idempotently enables or disables a user's like on a published video, versioning and optionally emitting an event only when the stored relation changes.
 func (repository *PostgresRepository) SetLike(ctx context.Context, userID, videoID string, enabled bool) (RelationResult, error) {
 	return repository.setRelation(ctx, "like", userID, videoID, enabled, true,
 		`INSERT INTO social.video_likes (user_id, video_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
@@ -37,6 +40,7 @@ func (repository *PostgresRepository) SetLike(ctx context.Context, userID, video
 	)
 }
 
+// SetFavorite idempotently enables or disables a user's favorite on a published video, versioning and optionally emitting an event only when the stored relation changes.
 func (repository *PostgresRepository) SetFavorite(ctx context.Context, userID, videoID string, enabled bool) (RelationResult, error) {
 	return repository.setRelation(ctx, "favorite", userID, videoID, enabled, true,
 		`INSERT INTO social.video_favorites (user_id, video_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
@@ -44,6 +48,7 @@ func (repository *PostgresRepository) SetFavorite(ctx context.Context, userID, v
 	)
 }
 
+// SetFollow idempotently enables or disables a follow relation, rejecting attempts to follow oneself and versioning and optionally emitting an event only on change.
 func (repository *PostgresRepository) SetFollow(ctx context.Context, followerID, followeeID string, enabled bool) (RelationResult, error) {
 	if followerID == followeeID {
 		return RelationResult{}, errors.New("users cannot follow themselves")
@@ -54,6 +59,7 @@ func (repository *PostgresRepository) SetFollow(ctx context.Context, followerID,
 	)
 }
 
+// setRelation transactionally applies an idempotent relation change, optionally requiring a published video, and versions the relation, enqueuing an outbox event (if configured) only when a row changes.
 func (repository *PostgresRepository) setRelation(ctx context.Context, kind, actorID, targetID string, enabled, requirePublishedVideo bool, insertSQL, deleteSQL string) (RelationResult, error) {
 	if actorID == "" || targetID == "" {
 		return RelationResult{}, errors.New("relation actor and target are required")

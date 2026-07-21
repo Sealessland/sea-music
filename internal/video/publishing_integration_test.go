@@ -10,6 +10,7 @@ import (
 	"github.com/sealessland/sea-music/internal/video"
 )
 
+// TestModerationPublishesPlayableVideoAndOwnerCanWithdraw verifies that only a moderator can publish a processed video, publication exposes a working signed playback URL and a non-empty cover URL, and the owner can withdraw it so it is no longer public while both state transitions are audited.
 func TestModerationPublishesPlayableVideoAndOwnerCanWithdraw(t *testing.T) {
 	database := videoTestDatabase(t)
 	store := videoTestObjectStore(t)

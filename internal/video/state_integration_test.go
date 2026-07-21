@@ -13,6 +13,7 @@ import (
 	"github.com/sealessland/sea-music/internal/video"
 )
 
+// TestPostgresTransitionUsesCompareAndSwapAndWritesAudit verifies that a successful PostgreSQL state transition increments the version and writes one audit record, while a stale expected version returns ErrVersionConflict without adding another record.
 func TestPostgresTransitionUsesCompareAndSwapAndWritesAudit(t *testing.T) {
 	database := videoTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -46,6 +47,7 @@ func TestPostgresTransitionUsesCompareAndSwapAndWritesAudit(t *testing.T) {
 	}
 }
 
+// videoTestDatabase opens the PostgreSQL integration-test database, skipping when SEA_VIDEO_TEST_DATABASE_URL is unset, applies bundled migrations, truncates related tables, and registers cleanup for the connection and timeout context.
 func videoTestDatabase(t *testing.T) *sql.DB {
 	t.Helper()
 	databaseURL := os.Getenv("SEA_VIDEO_TEST_DATABASE_URL")

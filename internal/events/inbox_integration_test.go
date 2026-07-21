@@ -10,6 +10,7 @@ import (
 	"github.com/sealessland/sea-music/internal/events"
 )
 
+// TestInboxCommitsSideEffectOnceAndAcknowledgesDuplicate verifies that processing an envelope atomically commits its side effect and inbox claim once, while a duplicate is acknowledged without rerunning the handler.
 func TestInboxCommitsSideEffectOnceAndAcknowledgesDuplicate(t *testing.T) {
 	database := eventsTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -41,6 +42,7 @@ func TestInboxCommitsSideEffectOnceAndAcknowledgesDuplicate(t *testing.T) {
 	}
 }
 
+// TestInboxRollsBackClaimWhenSideEffectFails verifies that a handler error is returned with processed false and atomically rolls back both the side effect and inbox claim.
 func TestInboxRollsBackClaimWhenSideEffectFails(t *testing.T) {
 	database := eventsTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

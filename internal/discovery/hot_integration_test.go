@@ -11,6 +11,7 @@ import (
 	"github.com/sealessland/sea-music/internal/discovery"
 )
 
+// TestHotRankingDeduplicatesEventsAndFallsBackToPersistedSnapshot verifies duplicate engagement events are projected once, live hot results fall back to a degraded persisted snapshot when Redis is unavailable, and sparse rankings are filled with recent videos.
 func TestHotRankingDeduplicatesEventsAndFallsBackToPersistedSnapshot(t *testing.T) {
 	database := discoveryTestDatabase(t)
 	options, err := redis.ParseURL(os.Getenv("SEA_REDIS_TEST_URL"))
@@ -80,6 +81,7 @@ func TestHotRankingDeduplicatesEventsAndFallsBackToPersistedSnapshot(t *testing.
 	}
 }
 
+// TestHotRankingKeepsRankOrderWhileFilteringInvisibleCandidates verifies hot results preserve Redis rank order while excluding unpublished videos and, for authenticated viewers, videos from blocked creators.
 func TestHotRankingKeepsRankOrderWhileFilteringInvisibleCandidates(t *testing.T) {
 	database := discoveryTestDatabase(t)
 	options, err := redis.ParseURL(os.Getenv("SEA_REDIS_TEST_URL"))

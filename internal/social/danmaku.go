@@ -38,6 +38,7 @@ type danmakuCursor struct {
 	ID         string `json:"id"`
 }
 
+// CreateDanmaku validates and sanitizes a message, atomically persists it for a published video subject to a per-author limit of five messages per 10 seconds, and enqueues its creation event when an outbox is available.
 func (repository *PostgresRepository) CreateDanmaku(ctx context.Context, authorID, videoID string, positionMS int, body string) (Danmaku, error) {
 	body, err := sanitizeDanmaku(body)
 	if err != nil || authorID == "" || videoID == "" || positionMS < 0 || positionMS > 43_200_000 {
@@ -88,6 +89,7 @@ func (repository *PostgresRepository) CreateDanmaku(ctx context.Context, authorI
 	return message, nil
 }
 
+// ListDanmaku returns a cursor-paginated page of visible messages in the half-open position range [startMS, endMS), ordered by position and ID, and rejects invalid ranges, limits, or cursors.
 func (repository *PostgresRepository) ListDanmaku(ctx context.Context, videoID string, startMS, endMS int, cursor string, limit int) (DanmakuPage, error) {
 	if videoID == "" || startMS < 0 || endMS <= startMS || endMS-startMS > 300_000 || limit <= 0 || limit > 500 {
 		return DanmakuPage{}, ErrInvalidDanmaku
@@ -139,6 +141,7 @@ func (repository *PostgresRepository) ListDanmaku(ctx context.Context, videoID s
 	return page, nil
 }
 
+// sanitizeDanmaku rejects non-space control characters and text outside the 1–100-rune normalized range, then HTML-escapes the whitespace-collapsed result.
 func sanitizeDanmaku(value string) (string, error) {
 	for _, character := range value {
 		if unicode.IsControl(character) && !unicode.IsSpace(character) {
@@ -152,11 +155,13 @@ func sanitizeDanmaku(value string) (string, error) {
 	return html.EscapeString(value), nil
 }
 
+// encodeDanmakuCursor serializes a position-and-ID cursor as unpadded URL-safe base64 JSON.
 func encodeDanmakuCursor(cursor danmakuCursor) string {
 	encoded, _ := json.Marshal(cursor)
 	return base64.RawURLEncoding.EncodeToString(encoded)
 }
 
+// decodeDanmakuCursor parses an unpadded URL-safe base64 JSON cursor and returns ErrInvalidCursor unless it has a nonnegative position and nonempty ID.
 func decodeDanmakuCursor(value string) (danmakuCursor, error) {
 	decoded, err := base64.RawURLEncoding.DecodeString(value)
 	if err != nil {

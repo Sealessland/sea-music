@@ -42,10 +42,12 @@ type PublicationService struct {
 	urlTTL     time.Duration
 }
 
+// NewPublicationService creates a publication service that uses repository for state and metadata, store for signed media URLs, and urlTTL for their lifetime.
 func NewPublicationService(repository *PostgresRepository, store *S3ObjectStore, urlTTL time.Duration) *PublicationService {
 	return &PublicationService{repository: repository, store: store, urlTTL: urlTTL}
 }
 
+// Review allows a moderator or admin to publish an approved video or mark a rejected video failed, requiring a nonempty reason and the expected version to match.
 func (service *PublicationService) Review(ctx context.Context, videoID string, actor Actor, expectedVersion int64, approved bool, reason string) (Video, error) {
 	if actor.Role != "moderator" && actor.Role != "admin" {
 		return Video{}, ErrModerationForbidden
@@ -61,6 +63,7 @@ func (service *PublicationService) Review(ctx context.Context, videoID string, a
 	return service.repository.Transition(ctx, videoID, actor.UserID, expectedVersion, target, reason)
 }
 
+// Withdraw moves a video to the withdrawn state when requested with a nonempty reason by its creator, a moderator, or an admin, subject to the expected version.
 func (service *PublicationService) Withdraw(ctx context.Context, videoID string, actor Actor, expectedVersion int64, reason string) (Video, error) {
 	current, err := service.repository.Get(ctx, videoID)
 	if err != nil {
@@ -76,6 +79,7 @@ func (service *PublicationService) Withdraw(ctx context.Context, videoID string,
 	return service.repository.Transition(ctx, videoID, actor.UserID, expectedVersion, StateWithdrawn, reason)
 }
 
+// GetPublic returns a published video with ready playback and cover renditions and freshly presigned URLs, failing if lookup or either URL signing operation fails.
 func (service *PublicationService) GetPublic(ctx context.Context, videoID string) (PublicVideo, error) {
 	record, err := service.repository.getPublicVideo(ctx, videoID)
 	if err != nil {
@@ -95,6 +99,7 @@ func (service *PublicationService) GetPublic(ctx context.Context, videoID string
 	return record.PublicVideo, nil
 }
 
+// getPublicVideo loads a published video only when verified source assets provide both ready playback and cover renditions, mapping no matching row to ErrPublicVideoNotFound.
 func (repository *PostgresRepository) getPublicVideo(ctx context.Context, videoID string) (publicVideoRecord, error) {
 	var record publicVideoRecord
 	err := repository.database.QueryRowContext(ctx, `

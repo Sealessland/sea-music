@@ -17,6 +17,7 @@ import (
 
 type Shutdown func(context.Context) error
 
+// Setup installs W3C trace-context and baggage propagation globally and, when endpoint is nonblank, installs an insecure OTLP/gRPC-backed global tracer provider whose returned shutdown function flushes and stops it; a blank endpoint leaves the provider unchanged and returns a no-op shutdown.
 func Setup(ctx context.Context, serviceName, endpoint string) (Shutdown, error) {
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{}, propagation.Baggage{},
@@ -45,6 +46,7 @@ func Setup(ctx context.Context, serviceName, endpoint string) (Shutdown, error) 
 	return provider.Shutdown, nil
 }
 
+// TraceParent returns the W3C traceparent value for the context's valid span, or falls back to the value produced by the global text-map propagator when no valid span context exists.
 func TraceParent(ctx context.Context) string {
 	spanContext := trace.SpanContextFromContext(ctx)
 	if spanContext.IsValid() {
@@ -55,6 +57,7 @@ func TraceParent(ctx context.Context) string {
 	return carrier.Get("traceparent")
 }
 
+// JoinShutdown returns a shutdown function that invokes each non-nil input in reverse order and joins all returned errors.
 func JoinShutdown(functions ...Shutdown) Shutdown {
 	return func(ctx context.Context) error {
 		var result error

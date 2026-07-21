@@ -9,6 +9,7 @@ import (
 	"github.com/sealessland/sea-music/internal/events"
 )
 
+// TestOutboxBacklogSurvivesBrokerOutageAndDrainsAfterRecovery verifies that a committed event remains pending with one recorded attempt after publication fails, then is published exactly once when made available after broker recovery; it skips unless SEA_EVENTS_TEST_BROKER is set.
 func TestOutboxBacklogSurvivesBrokerOutageAndDrainsAfterRecovery(t *testing.T) {
 	database := eventsTestDatabase(t)
 	broker := os.Getenv("SEA_EVENTS_TEST_BROKER")

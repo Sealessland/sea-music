@@ -13,6 +13,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/ratelimit"
 )
 
+// TestRedisTokenBucketIsAtomicAndReportsRetry verifies that a Redis-backed bucket atomically admits only its two-request burst, rejects the next request with a retry delay, refills after one second, and records the corresponding admission and rejection metrics; it skips when SEA_REDIS_TEST_URL is unset and clears the test key before use.
 func TestRedisTokenBucketIsAtomicAndReportsRetry(t *testing.T) {
 	redisURL := os.Getenv("SEA_REDIS_TEST_URL")
 	if redisURL == "" {

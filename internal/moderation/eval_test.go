@@ -9,6 +9,7 @@ import (
 	"github.com/sealessland/sea-music/internal/moderation"
 )
 
+// TestDecisionPolicyEvalCorpus loads the decision-policy regression corpus, requires at least six cases, and verifies that fixed reviewer and critic results produce each case's expected verdict at the configured approval and rejection thresholds.
 func TestDecisionPolicyEvalCorpus(t *testing.T) {
 	encoded, err := os.ReadFile("testdata/decision_policy_eval.json")
 	if err != nil {

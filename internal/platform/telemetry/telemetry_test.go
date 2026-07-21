@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
+// TestTraceParentCarriesCurrentSpanIdentity verifies that TraceParent formats the active sampled span as a version-00 traceparent value while restoring the prior global tracer provider after the test.
 func TestTraceParentCarriesCurrentSpanIdentity(t *testing.T) {
 	previous := otel.GetTracerProvider()
 	provider := trace.NewTracerProvider(trace.WithSampler(trace.AlwaysSample()))
@@ -25,6 +26,7 @@ func TestTraceParentCarriesCurrentSpanIdentity(t *testing.T) {
 	}
 }
 
+// TestSetupWithoutEndpointInstallsNoopSafely verifies that an empty telemetry endpoint returns no error and a shutdown function that can be called successfully.
 func TestSetupWithoutEndpointInstallsNoopSafely(t *testing.T) {
 	shutdown, err := telemetry.Setup(context.Background(), "test-service", "")
 	if err != nil {

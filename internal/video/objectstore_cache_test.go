@@ -10,6 +10,7 @@ import (
 	"github.com/sealessland/sea-music/internal/video"
 )
 
+// TestPresignedDownloadCacheIsBounded confirms that presigning more than 10,000 distinct downloads against the configured S3 endpoint keeps the download URL cache at or below its 10,000-entry limit.
 func TestPresignedDownloadCacheIsBounded(t *testing.T) {
 	endpoint := os.Getenv("SEA_VIDEO_TEST_S3_ENDPOINT")
 	if endpoint == "" {
@@ -32,6 +33,7 @@ func TestPresignedDownloadCacheIsBounded(t *testing.T) {
 	}
 }
 
+// TestPresignedDownloadCacheCanBeDisabled confirms that presigning a download with caching disabled leaves the download URL cache empty.
 func TestPresignedDownloadCacheCanBeDisabled(t *testing.T) {
 	endpoint := os.Getenv("SEA_VIDEO_TEST_S3_ENDPOINT")
 	if endpoint == "" {

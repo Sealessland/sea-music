@@ -11,6 +11,7 @@ import (
 	"github.com/sealessland/sea-music/internal/moderation"
 )
 
+// TestEinoEvaluatorParsesValidatedStructuredEvidence verifies that the evaluator treats request content as untrusted, parses valid structured model evidence, and preserves provider, model, and policy metadata.
 func TestEinoEvaluatorParsesValidatedStructuredEvidence(t *testing.T) {
 	chat := &fakeChatModel{content: `{"verdict":"reject","confidence":0.97,"summary":"hate speech in metadata","findings":[{"code":"hate_targeted","category":"hate","score":0.97}]}`}
 	evaluator, err := moderation.NewEinoEvaluator(chat, "openai", "test-model")
@@ -31,6 +32,7 @@ func TestEinoEvaluatorParsesValidatedStructuredEvidence(t *testing.T) {
 	}
 }
 
+// TestEinoEvaluatorFailsClosedOnMalformedOutput verifies that schema-invalid model output is rejected with ErrInvalidResult rather than accepted as an approval.
 func TestEinoEvaluatorFailsClosedOnMalformedOutput(t *testing.T) {
 	evaluator, err := moderation.NewEinoEvaluator(&fakeChatModel{content: `{"verdict":"approve","confidence":2}`}, "openai", "test-model")
 	if err != nil {
@@ -41,6 +43,7 @@ func TestEinoEvaluatorFailsClosedOnMalformedOutput(t *testing.T) {
 	}
 }
 
+// TestEinoCriticIndependentlyChallengesReviewerEvidence verifies that the critic receives the reviewer summary as untrusted input and may return a different validated verdict.
 func TestEinoCriticIndependentlyChallengesReviewerEvidence(t *testing.T) {
 	chat := &fakeChatModel{content: `{"verdict":"escalate","confidence":0.81,"summary":"quoted context is ambiguous","findings":[{"code":"context_ambiguous","category":"context","score":0.81}]}`}
 	critic, err := moderation.NewEinoCritic(chat, "openai", "test-model")
@@ -69,11 +72,13 @@ type fakeChatModel struct {
 	messages []*schema.Message
 }
 
+// Generate records the supplied messages and returns the fake's configured content as an assistant response.
 func (chat *fakeChatModel) Generate(_ context.Context, messages []*schema.Message, _ ...model.Option) (*schema.Message, error) {
 	chat.messages = messages
 	return schema.AssistantMessage(chat.content, nil), nil
 }
 
+// Stream always returns an error because streaming is unsupported by this fake model.
 func (*fakeChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
 	return nil, errors.New("not used")
 }

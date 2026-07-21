@@ -12,6 +12,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/migrate"
 )
 
+// TestFollowingCursorRemainsStableWhenNewVideoArrivesBetweenPages verifies that cursor pagination excludes a newly published video inserted after the first page and returns the remaining oldest video without duplication or omission.
 func TestFollowingCursorRemainsStableWhenNewVideoArrivesBetweenPages(t *testing.T) {
 	database := discoveryTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -51,6 +52,7 @@ func TestFollowingCursorRemainsStableWhenNewVideoArrivesBetweenPages(t *testing.
 	}
 }
 
+// discoveryTestDatabase opens the database specified by SEA_DISCOVERY_TEST_DATABASE_URL, skips when unset, applies bundled migrations, truncates user data with cascading resets, and registers cleanup for the connection and timeout context.
 func discoveryTestDatabase(t *testing.T) *sql.DB {
 	t.Helper()
 	url := os.Getenv("SEA_DISCOVERY_TEST_DATABASE_URL")
@@ -77,6 +79,7 @@ func discoveryTestDatabase(t *testing.T) *sql.DB {
 	return database
 }
 
+// insertDiscoveryUsers inserts fixed viewer and creator accounts, fails the test on either insertion error, and returns their IDs in viewer-then-creator order.
 func insertDiscoveryUsers(t *testing.T, ctx context.Context, database *sql.DB) (string, string) {
 	t.Helper()
 	var viewer, creator string

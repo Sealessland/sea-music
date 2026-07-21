@@ -80,6 +80,7 @@ func LoadFrom(lookup LookupEnv) (Config, error) {
 	return cfg, nil
 }
 
+// defaults builds the baseline configuration, using environment values for string settings when present and built-in development defaults otherwise.
 func defaults(lookup LookupEnv) Config {
 	return Config{
 		Environment: valueOrDefault(lookup, "SEA_ENV", "development"),

@@ -13,6 +13,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
+// TestPoisonEventRetriesThenReachesRealDeadLetterTopic verifies that a failing Kafka event is retried three times, leaves no inbox row, persists one dead letter, dispatches that dead letter to the <topic>.dlq topic, rejects replay by a non-admin, and after admin replay marks the dead letter as replayed with replay_count 1.
 func TestPoisonEventRetriesThenReachesRealDeadLetterTopic(t *testing.T) {
 	database := eventsTestDatabase(t)
 	broker := os.Getenv("SEA_EVENTS_TEST_BROKER")

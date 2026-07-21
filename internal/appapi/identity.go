@@ -20,10 +20,12 @@ type IdentityHandler struct {
 	logger      *slog.Logger
 }
 
+// NewIdentityHandler constructs an identity HTTP handler that uses the token manager for bearer authentication and retains the supplied rate-limit policies and logger for route handling.
 func NewIdentityHandler(service *identity.Service, tokens *identity.TokenManager, limits *RateLimitMiddleware, writePolicy, readPolicy ratelimit.Policy, logger *slog.Logger) *IdentityHandler {
 	return &IdentityHandler{service: service, auth: NewAuthenticator(tokens), limits: limits, writePolicy: writePolicy, readPolicy: readPolicy, logger: logger}
 }
 
+// RegisterRoutes mounts the user registration, login, token refresh, and authenticated current-user endpoints with their respective write or read rate limits.
 func (h *IdentityHandler) RegisterRoutes(router gin.IRouter) {
 	router.POST("/api/v1/users", h.limits.GinWrap("identity_write", h.writePolicy, false), h.register)
 	router.POST("/api/v1/sessions", h.limits.GinWrap("identity_write", h.writePolicy, false), h.login)
@@ -31,6 +33,7 @@ func (h *IdentityHandler) RegisterRoutes(router gin.IRouter) {
 	router.GET("/api/v1/me", h.auth.Require(), h.limits.GinWrap("identity_read", h.readPolicy, true), h.me)
 }
 
+// register validates a registration request, creates the user, and returns 201, mapping validation and identity conflicts to 400 and 409 while logging unexpected failures.
 func (h *IdentityHandler) register(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	var input identity.RegisterInput
@@ -52,6 +55,7 @@ func (h *IdentityHandler) register(context *gin.Context) {
 	}
 }
 
+// me returns the authenticated principal's current user, treating a missing principal or user as an authentication failure and logging unexpected lookup errors.
 func (h *IdentityHandler) me(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	principal, ok := identity.PrincipalFromContext(request.Context())
@@ -71,6 +75,7 @@ func (h *IdentityHandler) me(context *gin.Context) {
 	}
 }
 
+// login validates credentials from the request and returns a token pair, mapping invalid credentials to 401 and logging unexpected failures.
 func (h *IdentityHandler) login(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	var input identity.LoginInput
@@ -90,6 +95,7 @@ func (h *IdentityHandler) login(context *gin.Context) {
 	}
 }
 
+// refresh exchanges a refresh token for a new token pair, mapping invalid or replayed tokens to the same 401 response and logging unexpected failures.
 func (h *IdentityHandler) refresh(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	var input struct {

@@ -10,6 +10,7 @@ import (
 	"github.com/sealessland/sea-music/internal/video"
 )
 
+// TestProcessingJobLeaseExpiresAndCanBeRecovered verifies that an active lease blocks other workers, an expired lease permits the same job to be reclaimed with an incremented attempt count, and only the current owner can renew it.
 func TestProcessingJobLeaseExpiresAndCanBeRecovered(t *testing.T) {
 	database := videoTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -40,6 +41,7 @@ func TestProcessingJobLeaseExpiresAndCanBeRecovered(t *testing.T) {
 	}
 }
 
+// TestProcessingJobRetriesAreBounded verifies that failed jobs remain claimable until max_attempts is reached, then stay failed and are excluded from subsequent claims.
 func TestProcessingJobRetriesAreBounded(t *testing.T) {
 	database := videoTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -74,6 +76,7 @@ func TestProcessingJobRetriesAreBounded(t *testing.T) {
 	}
 }
 
+// insertPendingProcessingJob creates a creator, uploaded video, verified source asset, and pending processing job with the specified retry limit, failing the test on any database error.
 func insertPendingProcessingJob(t *testing.T, ctx context.Context, database *sql.DB, maxAttempts int) {
 	t.Helper()
 	creatorID := insertVideoCreator(t, ctx, database, "lease_creator", "lease@example.com")
@@ -90,6 +93,7 @@ func insertPendingProcessingJob(t *testing.T, ctx context.Context, database *sql
 	}
 }
 
+// TestStaleQueuedProcessingJobsAreActivated verifies that only queued jobs older than the threshold become pending, activation is idempotent, and the activated job can be claimed.
 func TestStaleQueuedProcessingJobsAreActivated(t *testing.T) {
 	database := videoTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -125,6 +129,7 @@ func TestStaleQueuedProcessingJobsAreActivated(t *testing.T) {
 	}
 }
 
+// insertQueuedProcessingJob creates a creator, uploaded video, verified source asset, and queued processing job, returning the job ID and failing the test on any database error.
 func insertQueuedProcessingJob(t *testing.T, ctx context.Context, database *sql.DB, username, email string) string {
 	t.Helper()
 	creatorID := insertVideoCreator(t, ctx, database, username, email)

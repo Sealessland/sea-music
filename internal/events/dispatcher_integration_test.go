@@ -13,6 +13,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
+// TestDispatcherPublishesToRealKafkaBeforeMarkingOutboxDelivered verifies that one committed outbox event is published to a real Kafka broker, consumed back and matched by ID and Type, then persisted in the outbox with state "published" and a non-nil published_at timestamp; skips when no test broker is specified.
 func TestDispatcherPublishesToRealKafkaBeforeMarkingOutboxDelivered(t *testing.T) {
 	database := eventsTestDatabase(t)
 	broker := os.Getenv("SEA_EVENTS_TEST_BROKER")
@@ -63,6 +64,7 @@ func TestDispatcherPublishesToRealKafkaBeforeMarkingOutboxDelivered(t *testing.T
 	}
 }
 
+// enqueueCommittedEvent inserts a representative event into the transactional outbox within a transaction, commits it, and returns the enqueued envelope; it rolls back and fails the test on EnqueueTx error, and fails the test on commit error.
 func enqueueCommittedEvent(t *testing.T, ctx context.Context, database *sql.DB, topic string) events.Envelope {
 	t.Helper()
 	transaction, err := database.BeginTx(ctx, nil)

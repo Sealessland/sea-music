@@ -44,15 +44,18 @@ type PostgresRepository struct {
 	ranking  redis.UniversalClient
 }
 
+// WithRanking sets the optional ranking client on the repository in place and returns the same repository for chaining.
 func (repository *PostgresRepository) WithRanking(client redis.UniversalClient) *PostgresRepository {
 	repository.ranking = client
 	return repository
 }
 
+// NewPostgresRepository creates a repository backed by database, with ranking disabled until WithRanking is called.
 func NewPostgresRepository(database *sql.DB) *PostgresRepository {
 	return &PostgresRepository{database: database}
 }
 
+// Following returns a cursor-paginated, reverse-chronological feed of published videos from creators the viewer follows, excluding blocked relationships and marking each item as followed_creator.
 func (repository *PostgresRepository) Following(ctx context.Context, viewerID, cursor string, limit int) (FeedPage, error) {
 	if viewerID == "" || limit <= 0 || limit > 100 {
 		return FeedPage{}, ErrInvalidFeedRequest
@@ -107,6 +110,7 @@ func (repository *PostgresRepository) Following(ctx context.Context, viewerID, c
 	return pageFeed(items, limit), nil
 }
 
+// scanFeedItems scans all remaining rows into feed items and wraps scan or iteration errors.
 func scanFeedItems(rows *sql.Rows) ([]FeedItem, error) {
 	items := make([]FeedItem, 0)
 	for rows.Next() {
@@ -122,6 +126,7 @@ func scanFeedItems(rows *sql.Rows) ([]FeedItem, error) {
 	return items, nil
 }
 
+// pageFeed trims an over-fetched item slice to limit and, when another page exists, sets HasMore and a cursor derived from the last returned item.
 func pageFeed(items []FeedItem, limit int) FeedPage {
 	page := FeedPage{Items: items}
 	if len(items) > limit {
@@ -133,11 +138,13 @@ func pageFeed(items []FeedItem, limit int) FeedPage {
 	return page
 }
 
+// encodeFeedCursor serializes a feed position as unpadded URL-safe base64; JSON marshaling errors are ignored because feedCursor is always serializable.
 func encodeFeedCursor(cursor feedCursor) string {
 	data, _ := json.Marshal(cursor)
 	return base64.RawURLEncoding.EncodeToString(data)
 }
 
+// decodeFeedCursor parses an unpadded URL-safe base64 JSON cursor and returns ErrInvalidFeedCursor if decoding fails or either required field is empty.
 func decodeFeedCursor(value string) (feedCursor, error) {
 	data, err := base64.RawURLEncoding.DecodeString(value)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// Recommend returns up to limit published videos excluding the viewer's own and mutually blocked creators, ranking by follows, category affinity, popularity, and recency; viewers without follow or like history fall back to cold-start recommendations, and invalid requests return ErrInvalidFeedRequest.
 func (repository *PostgresRepository) Recommend(ctx context.Context, viewerID string, limit int) (FeedPage, error) {
 	if viewerID == "" || limit <= 0 || limit > 100 {
 		return FeedPage{}, ErrInvalidFeedRequest
@@ -76,6 +77,7 @@ func (repository *PostgresRepository) Recommend(ctx context.Context, viewerID st
 	return FeedPage{Items: items}, rows.Err()
 }
 
+// coldStart returns a category-diversified selection from the newest published videos, excluding the viewer's own and mutually blocked creators, with each item marked "cold_start_recent".
 func (repository *PostgresRepository) coldStart(ctx context.Context, viewerID string, limit int) (FeedPage, error) {
 	rows, err := repository.database.QueryContext(ctx, `
 		SELECT v.id::text, v.creator_id::text, v.title, v.description, v.category, v.published_at
@@ -105,6 +107,7 @@ func (repository *PostgresRepository) coldStart(ctx context.Context, viewerID st
 	return FeedPage{Items: diversifyCategories(candidates, limit)}, rows.Err()
 }
 
+// diversifyCategories round-robins candidates by category in first-seen category order, preserving order within each category and returning at most limit items without modifying the input slice.
 func diversifyCategories(candidates []FeedItem, limit int) []FeedItem {
 	groups := make(map[string][]FeedItem)
 	var order []string

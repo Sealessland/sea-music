@@ -11,6 +11,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/migrate"
 )
 
+// TestApplyIsTransactionalAndIdempotentAgainstPostgres verifies that bundled migrations create all application schemas on first application and that reapplying them reports no changes; it skips unless SEA_MIGRATION_TEST_DATABASE_URL is set.
 func TestApplyIsTransactionalAndIdempotentAgainstPostgres(t *testing.T) {
 	databaseURL := os.Getenv("SEA_MIGRATION_TEST_DATABASE_URL")
 	if databaseURL == "" {

@@ -11,10 +11,12 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
+// init configures Gin's JSON decoder to reject unknown object fields for subsequent bindings.
 func init() {
 	gin.EnableJsonDecoderDisallowUnknownFields()
 }
 
+// bindJSON binds a body of at most 1 MiB to target and requires exactly one valid JSON value, returning a generic validation error for malformed input and a distinct error for trailing values.
 func bindJSON(context *gin.Context, target any) error {
 	request := context.Request
 	request.Body = http.MaxBytesReader(context.Writer, request.Body, 1<<20)

@@ -64,10 +64,12 @@ type UploadService struct {
 	maxBytes   int64
 }
 
+// NewUploadService constructs an upload service that enforces maxBytes and issues upload grants valid for ttl.
 func NewUploadService(repository uploadRepository, store uploadObjectStore, ttl time.Duration, maxBytes int64) *UploadService {
 	return &UploadService{repository: repository, store: store, ttl: ttl, maxBytes: maxBytes}
 }
 
+// CreateGrant validates and normalizes MP4 upload metadata, persists a pending source asset, and returns a presigned upload URL or ErrInvalidUpload for invalid input.
 func (service *UploadService) CreateGrant(ctx context.Context, request UploadRequest) (UploadGrant, error) {
 	request.ContentType = strings.ToLower(strings.TrimSpace(request.ContentType))
 	request.ChecksumSHA256 = strings.ToLower(strings.TrimSpace(request.ChecksumSHA256))
@@ -89,6 +91,7 @@ func (service *UploadService) CreateGrant(ctx context.Context, request UploadReq
 	return UploadGrant{AssetID: asset.ID, URL: url, ExpiresAt: expiresAt}, nil
 }
 
+// Finalize verifies the uploaded object against its declared size, content type, and checksum before finalizing; already verified assets skip inspection, while mismatches are best-effort rejected and return ErrInvalidUpload.
 func (service *UploadService) Finalize(ctx context.Context, videoID, creatorID string) (FinalizeResult, error) {
 	asset, err := service.repository.GetUpload(ctx, videoID, creatorID)
 	if err != nil {

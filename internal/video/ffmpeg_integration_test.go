@@ -17,6 +17,7 @@ import (
 	"github.com/sealessland/sea-music/internal/video"
 )
 
+// TestRealFFmpegWorkerCreatesPlayableRenditionAndCover verifies that a worker reclaims an expired processing job, produces two nonempty artifacts, advances the video to review, and emits an H.264-playable rendition.
 func TestRealFFmpegWorkerCreatesPlayableRenditionAndCover(t *testing.T) {
 	database := videoTestDatabase(t)
 	store := videoTestObjectStore(t)
@@ -65,6 +66,7 @@ func TestRealFFmpegWorkerCreatesPlayableRenditionAndCover(t *testing.T) {
 	}
 }
 
+// TestRealMediaProcessingTimeoutFailsWithinRetryBudget verifies that an FFmpeg deadline is returned as context.DeadlineExceeded and permanently fails a job whose sole attempt is exhausted.
 func TestRealMediaProcessingTimeoutFailsWithinRetryBudget(t *testing.T) {
 	database := videoTestDatabase(t)
 	store := videoTestObjectStore(t)
@@ -95,6 +97,7 @@ func TestRealMediaProcessingTimeoutFailsWithinRetryBudget(t *testing.T) {
 	}
 }
 
+// TestRealFFmpegWorkerRejectsBadMediaAndExhaustsRetryBudget verifies that invalid uploaded media causes processing to error and marks both the job and video failed when no retries remain.
 func TestRealFFmpegWorkerRejectsBadMediaAndExhaustsRetryBudget(t *testing.T) {
 	database := videoTestDatabase(t)
 	store := videoTestObjectStore(t)
@@ -128,6 +131,7 @@ func TestRealFFmpegWorkerRejectsBadMediaAndExhaustsRetryBudget(t *testing.T) {
 	}
 }
 
+// generateVideoFixture creates a one-second H.264/yuv420p test video whose aspect ratio exercises even-dimension scaling, failing the test if FFmpeg cannot generate it.
 func generateVideoFixture(t *testing.T, ctx context.Context) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "source.mp4")
@@ -141,6 +145,7 @@ func generateVideoFixture(t *testing.T, ctx context.Context) string {
 	return path
 }
 
+// finalizeUploadedFile uploads the file through a checksum-bound grant, finalizes the draft, and transactionally activates its processing job, failing the test on any setup error.
 func finalizeUploadedFile(t *testing.T, ctx context.Context, repository *video.PostgresRepository, store *video.S3ObjectStore, draft video.Video, creatorID, path string) video.FinalizeResult {
 	t.Helper()
 	payload, err := os.ReadFile(path)
@@ -183,6 +188,7 @@ func finalizeUploadedFile(t *testing.T, ctx context.Context, repository *video.P
 	return result
 }
 
+// repositoryDatabaseTransaction begins a repository transaction using ctx and returns any begin error unchanged.
 func repositoryDatabaseTransaction(ctx context.Context, repository *video.PostgresRepository) (*sql.Tx, error) {
 	return repository.BeginTx(ctx)
 }

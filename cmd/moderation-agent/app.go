@@ -33,6 +33,7 @@ import (
 	grpc_health_v1 "google.golang.org/grpc/health/grpc_health_v1"
 )
 
+// run starts the moderation gRPC, health, metrics, readiness, and evaluation services, then gracefully shuts them and telemetry down on SIGINT or SIGTERM; startup and unexpected serving failures are returned.
 func run() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -178,6 +179,7 @@ func run() error {
 	return nil
 }
 
+// moderationServerCredentials loads the server certificate and client CA and returns TLS 1.2-or-newer credentials that require and verify client certificates.
 func moderationServerCredentials(cfg config.Config) (credentials.TransportCredentials, error) {
 	certificate, err := tls.LoadX509KeyPair(cfg.Moderation.TLSCertFile, cfg.Moderation.TLSKeyFile)
 	if err != nil {
@@ -197,6 +199,7 @@ func moderationServerCredentials(cfg config.Config) (credentials.TransportCreden
 	}), nil
 }
 
+// newEvaluator returns a manual-escalation evaluator when the provider is disabled; otherwise it builds a chat model with a JSON response format and uses it to construct an Eino evaluator, an Eino critic, and an agent evaluator that applies the configured approve and reject decision thresholds.
 func newEvaluator(ctx context.Context, cfg config.Config) (moderation.Evaluator, error) {
 	if cfg.Moderation.Provider == "disabled" {
 		return moderation.NewManualEscalationEvaluator(), nil

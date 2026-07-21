@@ -12,6 +12,7 @@ import (
 // Registry is shared by application and infrastructure collectors.
 var Registry = prometheus.NewRegistry()
 
+// init registers Go runtime and process collectors with the process-wide registry, panicking if either registration fails.
 func init() {
 	Registry.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 }

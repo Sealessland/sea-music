@@ -24,10 +24,12 @@ type OutboxWriter interface {
 
 type OutboxWriterFunc func(context.Context, *sql.Tx, DomainEvent) (string, error)
 
+// Enqueue delegates writing event to the outbox to the wrapped function and returns its identifier or error unchanged.
 func (function OutboxWriterFunc) Enqueue(ctx context.Context, transaction *sql.Tx, event DomainEvent) (string, error) {
 	return function(ctx, transaction, event)
 }
 
+// ActivateProcessingJobTx atomically moves a queued processing job to pending and makes it immediately available; it is idempotent for jobs already pending, processing, or succeeded, and errors for other states or missing jobs.
 func ActivateProcessingJobTx(ctx context.Context, transaction *sql.Tx, jobID string) error {
 	result, err := transaction.ExecContext(ctx, `
 		UPDATE video.processing_jobs

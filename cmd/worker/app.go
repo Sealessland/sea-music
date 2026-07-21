@@ -216,6 +216,7 @@ func run() error {
 	return nil
 }
 
+// moderationClientCredentials returns insecure gRPC transport credentials when configured; otherwise it loads the client certificate and private CA to create TLS 1.2-or-newer credentials for the configured server name.
 func moderationClientCredentials(cfg config.Config) (credentials.TransportCredentials, error) {
 	if cfg.Moderation.Insecure {
 		return insecure.NewCredentials(), nil

@@ -27,6 +27,7 @@ type ProcessingJob struct {
 	AvailableAt   time.Time
 }
 
+// ClaimProcessingJob atomically claims the next available pending or expired-lease job, increments its attempt count, and returns ErrNoProcessingJob when none is eligible.
 func (repository *PostgresRepository) ClaimProcessingJob(ctx context.Context, workerID string, leaseDuration time.Duration) (ProcessingJob, error) {
 	workerID = strings.TrimSpace(workerID)
 	if workerID == "" || leaseDuration <= 0 {
@@ -88,6 +89,7 @@ func (repository *PostgresRepository) ActivateStaleQueuedJobs(ctx context.Contex
 	return activated, nil
 }
 
+// RenewProcessingLease extends an unexpired processing lease owned by workerID and returns ErrProcessingLeaseLost if the job is no longer validly leased to that worker.
 func (repository *PostgresRepository) RenewProcessingLease(ctx context.Context, jobID, workerID string, leaseDuration time.Duration) (ProcessingJob, error) {
 	if strings.TrimSpace(jobID) == "" || strings.TrimSpace(workerID) == "" || leaseDuration <= 0 {
 		return ProcessingJob{}, errors.New("invalid processing lease renewal")
@@ -113,6 +115,7 @@ func (repository *PostgresRepository) RenewProcessingLease(ctx context.Context, 
 	return job, nil
 }
 
+// FailProcessingJob releases a valid processing lease and either reschedules the job after backoff or, when attempts are exhausted, marks the job failed and atomically transitions a still-processing video to failed with an audit record; it returns ErrProcessingLeaseLost for an invalid or expired lease.
 func (repository *PostgresRepository) FailProcessingJob(ctx context.Context, jobID, workerID, failure string, backoff time.Duration) error {
 	if strings.TrimSpace(jobID) == "" || strings.TrimSpace(workerID) == "" || backoff < 0 {
 		return errors.New("invalid processing failure")
@@ -178,6 +181,7 @@ func (repository *PostgresRepository) FailProcessingJob(ctx context.Context, job
 	return nil
 }
 
+// StartProcessingJob validates and locks the worker's live job lease, then atomically transitions an uploaded video to processing with an audit record or accepts one already processing; other video states return ErrInvalidTransition.
 func (repository *PostgresRepository) StartProcessingJob(ctx context.Context, jobID, workerID string) (ProcessingInput, error) {
 	transaction, err := repository.database.BeginTx(ctx, nil)
 	if err != nil {
@@ -212,6 +216,7 @@ func (repository *PostgresRepository) StartProcessingJob(ctx context.Context, jo
 	return input, nil
 }
 
+// CompleteProcessingJob validates and upserts nonempty rendition output under a live worker lease, marks the job succeeded, atomically moves the processing video to review with an audit record, and enqueues a moderation-ready event when an outbox is available.
 func (repository *PostgresRepository) CompleteProcessingJob(ctx context.Context, jobID, workerID string, renditions []Rendition) (ProcessingResult, error) {
 	if len(renditions) == 0 {
 		return ProcessingResult{}, errors.New("processing produced no renditions")
@@ -287,6 +292,7 @@ func (repository *PostgresRepository) CompleteProcessingJob(ctx context.Context,
 	return ProcessingResult{Video: current, Renditions: renditions}, nil
 }
 
+// lockProcessingInput locks and returns the processing job and source-asset input only while workerID owns an unexpired lease, returning ErrProcessingLeaseLost otherwise.
 func lockProcessingInput(ctx context.Context, transaction *sql.Tx, jobID, workerID string, now time.Time) (ProcessingInput, error) {
 	var input ProcessingInput
 	err := transaction.QueryRowContext(ctx, `

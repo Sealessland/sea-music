@@ -11,6 +11,7 @@ import (
 	"github.com/sealessland/sea-music/internal/appapi"
 )
 
+// TestFrontendServesProductShellAndRealAPIClient verifies that registered frontend routes serve the HTML shell, JavaScript API client, and stylesheet with expected content types and markers while unknown paths return 404.
 func TestFrontendServesProductShellAndRealAPIClient(t *testing.T) {
 	router := gin.New()
 	appapi.RegisterFrontendRoutes(router)

@@ -123,10 +123,12 @@ type Service struct {
 	store Store
 }
 
+// NewService returns a moderation service that persists reviews through store; methods that require storage fail if store is nil.
 func NewService(store Store) *Service {
 	return &Service{store: store}
 }
 
+// StartReview validates and hashes request, then creates and returns its initial persisted operation.
 func (service *Service) StartReview(ctx context.Context, request ReviewRequest) (Operation, error) {
 	if service == nil || service.store == nil {
 		return Operation{}, errors.New("moderation store is required")
@@ -141,6 +143,7 @@ func (service *Service) StartReview(ctx context.Context, request ReviewRequest) 
 	return service.store.Create(ctx, request, inputHash)
 }
 
+// GetReview retrieves the persisted operation with a non-blank ID, returning ErrInvalidRequest for a missing store or invalid ID.
 func (service *Service) GetReview(ctx context.Context, operationID string) (Operation, error) {
 	if service == nil || service.store == nil || strings.TrimSpace(operationID) == "" {
 		return Operation{}, ErrInvalidRequest
@@ -148,6 +151,7 @@ func (service *Service) GetReview(ctx context.Context, operationID string) (Oper
 	return service.store.Get(ctx, operationID)
 }
 
+// CompleteReview validates and persists a result for a non-blank operation ID, forcibly clearing CanPublish because moderation evidence cannot authorize publication.
 func (service *Service) CompleteReview(ctx context.Context, operationID string, result Result) (Operation, error) {
 	if service == nil || service.store == nil || strings.TrimSpace(operationID) == "" {
 		return Operation{}, ErrInvalidRequest
@@ -161,6 +165,7 @@ func (service *Service) CompleteReview(ctx context.Context, operationID string, 
 	return service.store.Complete(ctx, operationID, result)
 }
 
+// Validate returns ErrInvalidRequest unless the request has valid identity, version, policy, mode, title, and at least one asset with a kind, URI, and SHA-256 value.
 func (request ReviewRequest) Validate() error {
 	if strings.TrimSpace(request.RequestID) == "" || strings.TrimSpace(request.VideoID) == "" ||
 		request.VideoVersion < 0 || strings.TrimSpace(request.PolicyVersion) == "" ||
@@ -175,6 +180,7 @@ func (request ReviewRequest) Validate() error {
 	return nil
 }
 
+// Hash returns the lowercase SHA-256 digest of the request's JSON encoding, wrapping any encoding error.
 func (request ReviewRequest) Hash() (string, error) {
 	encoded, err := json.Marshal(request)
 	if err != nil {
@@ -184,6 +190,7 @@ func (request ReviewRequest) Hash() (string, error) {
 	return hex.EncodeToString(digest[:]), nil
 }
 
+// Validate returns ErrInvalidResult unless the result, findings, optional votes, and policy checks satisfy their required fields, enum values, score ranges, timestamps, and size limits.
 func (result Result) Validate() error {
 	if result.Verdict != VerdictApprove && result.Verdict != VerdictReject && result.Verdict != VerdictEscalate {
 		return ErrInvalidResult

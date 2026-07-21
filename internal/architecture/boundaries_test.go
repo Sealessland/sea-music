@@ -22,6 +22,7 @@ var domainModules = []string{
 	"platform",
 }
 
+// TestDomainModulesExist verifies that every declared domain module exists under internal as a directory.
 func TestDomainModulesExist(t *testing.T) {
 	root := repositoryRoot(t)
 
@@ -39,6 +40,7 @@ func TestDomainModulesExist(t *testing.T) {
 	}
 }
 
+// TestDomainModulesDoNotImportEachOther scans non-test Go files in each domain module and reports direct imports of other declared domain modules via t.Errorf; it fatally fails the test only if directory traversal or parsing errors occur.
 func TestDomainModulesDoNotImportEachOther(t *testing.T) {
 	root := repositoryRoot(t)
 	fset := token.NewFileSet()
@@ -72,6 +74,7 @@ func TestDomainModulesDoNotImportEachOther(t *testing.T) {
 	}
 }
 
+// TestInnerLayersDoNotImportHTTPAdapter scans non-test Go files in each domain module and reports imports of the appapi HTTP adapter, failing immediately if traversal or parsing fails.
 func TestInnerLayersDoNotImportHTTPAdapter(t *testing.T) {
 	root := repositoryRoot(t)
 	fset := token.NewFileSet()
@@ -105,6 +108,7 @@ func TestInnerLayersDoNotImportHTTPAdapter(t *testing.T) {
 	}
 }
 
+// assertAllowedDomainImport reports an internal import when it crosses directly from one declared domain module to another, while allowing external, same-domain, and non-domain internal imports.
 func assertAllowedDomainImport(t *testing.T, fset *token.FileSet, owner, importPath string, spec *ast.ImportSpec) {
 	t.Helper()
 	internalPrefix := modulePath + "/internal/"
@@ -124,6 +128,7 @@ func assertAllowedDomainImport(t *testing.T, fset *token.FileSet, owner, importP
 	}
 }
 
+// repositoryRoot returns the absolute path two directories above the current working directory and fatally fails the test if that path cannot be resolved.
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))

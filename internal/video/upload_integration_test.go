@@ -15,6 +15,7 @@ import (
 	"github.com/sealessland/sea-music/internal/video"
 )
 
+// TestDirectUploadIsVerifiedAndFinalizedExactlyOnce verifies that a valid signed S3 upload finalizes idempotently to the same asset and job, leaves the video uploaded, and creates exactly one processing job.
 func TestDirectUploadIsVerifiedAndFinalizedExactlyOnce(t *testing.T) {
 	database := videoTestDatabase(t)
 	store := videoTestObjectStore(t)
@@ -72,6 +73,7 @@ func TestDirectUploadIsVerifiedAndFinalizedExactlyOnce(t *testing.T) {
 	}
 }
 
+// TestFinalizeRejectsObjectWithInvalidChecksum verifies that finalization detects uploaded bytes that do not match the declared SHA-256 checksum and creates no processing job.
 func TestFinalizeRejectsObjectWithInvalidChecksum(t *testing.T) {
 	database := videoTestDatabase(t)
 	store := videoTestObjectStore(t)
@@ -117,6 +119,7 @@ func TestFinalizeRejectsObjectWithInvalidChecksum(t *testing.T) {
 	}
 }
 
+// videoTestObjectStore creates an S3-backed test object store from SEA_VIDEO_TEST_S3_ENDPOINT, skipping the test when the endpoint is unset and failing it when initialization fails.
 func videoTestObjectStore(t *testing.T) *video.S3ObjectStore {
 	t.Helper()
 	endpoint := os.Getenv("SEA_VIDEO_TEST_S3_ENDPOINT")
@@ -133,6 +136,7 @@ func videoTestObjectStore(t *testing.T) *video.S3ObjectStore {
 	return store
 }
 
+// insertVideoCreator inserts a fixture user with the supplied username and email, fails the test on database error, and returns the generated creator ID.
 func insertVideoCreator(t *testing.T, ctx context.Context, database *sql.DB, username, email string) string {
 	t.Helper()
 	var creatorID string

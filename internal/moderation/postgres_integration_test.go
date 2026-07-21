@@ -13,6 +13,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/migrate"
 )
 
+// TestPostgresStorePersistsIdempotentReviewAndCompletedEvidence verifies that PostgreSQL reuses an operation for identical request IDs, rejects conflicting reuse, and persists completed escalation evidence without permitting publication.
 func TestPostgresStorePersistsIdempotentReviewAndCompletedEvidence(t *testing.T) {
 	database := moderationTestDatabase(t)
 	store := moderation.NewPostgresStore(database)
@@ -52,6 +53,7 @@ func TestPostgresStorePersistsIdempotentReviewAndCompletedEvidence(t *testing.T)
 	}
 }
 
+// TestPostgresStoreClaimsOneOperationWithALeaseAndRetriesFailure verifies exclusive leasing, immediate retry after failure, rejection of a stale lease holder, and successful completion by the current claimant.
 func TestPostgresStoreClaimsOneOperationWithALeaseAndRetriesFailure(t *testing.T) {
 	database := moderationTestDatabase(t)
 	store := moderation.NewPostgresStore(database)
@@ -90,6 +92,7 @@ func TestPostgresStoreClaimsOneOperationWithALeaseAndRetriesFailure(t *testing.T
 	}
 }
 
+// TestDispatcherReliablyStartsAndCollectsShadowReview verifies that a queued video review is dispatched in shadow mode with its source URI, collected to completion, and returned to pending with an incremented failure count when a completed response lacks a result.
 func TestDispatcherReliablyStartsAndCollectsShadowReview(t *testing.T) {
 	database := moderationTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -165,11 +168,13 @@ type dispatchRemote struct {
 	request moderation.ReviewRequest
 }
 
+// StartReview records the dispatched request and returns a fixed pending operation for dispatcher integration testing.
 func (remote *dispatchRemote) StartReview(_ context.Context, request moderation.ReviewRequest) (moderation.Operation, error) {
 	remote.request = request
 	return moderation.Operation{ID: "01980c55-7c80-7abc-8def-0123456789ac", Status: moderation.StatusPending}, nil
 }
 
+// GetReview returns the fixed operation as completed with manual-fallback escalation evidence.
 func (remote *dispatchRemote) GetReview(context.Context, string) (moderation.Operation, error) {
 	return moderation.Operation{ID: "01980c55-7c80-7abc-8def-0123456789ac", Status: moderation.StatusCompleted, Result: &moderation.Result{
 		Verdict: moderation.VerdictEscalate, Confidence: 0, Summary: "manual review", Provider: "manual-fallback", Model: "none", PolicyVersion: "ugc-v1",
@@ -178,14 +183,17 @@ func (remote *dispatchRemote) GetReview(context.Context, string) (moderation.Ope
 
 type badCompletedRemote struct{}
 
+// StartReview returns a fixed completed operation without a result to exercise invalid-response retry handling.
 func (badCompletedRemote) StartReview(context.Context, moderation.ReviewRequest) (moderation.Operation, error) {
 	return moderation.Operation{ID: "01980c55-7c80-7abc-8def-0123456789ae", Status: moderation.StatusCompleted}, nil
 }
 
+// GetReview always returns an error because the invalid completed operation should fail validation before polling.
 func (badCompletedRemote) GetReview(context.Context, string) (moderation.Operation, error) {
 	return moderation.Operation{}, errors.New("not used")
 }
 
+// moderationTestDatabase opens the database named by SEA_MODERATION_TEST_DATABASE_URL, skips when unset, applies bundled migrations, truncates test tables, and registers timeout and close cleanup.
 func moderationTestDatabase(t *testing.T) *sql.DB {
 	t.Helper()
 	databaseURL := os.Getenv("SEA_MODERATION_TEST_DATABASE_URL")

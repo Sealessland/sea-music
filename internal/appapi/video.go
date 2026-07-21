@@ -19,10 +19,12 @@ type VideoHandler struct {
 	logger      *slog.Logger
 }
 
+// NewVideoHandler constructs a handler that uses the given repository and services to serve video API requests.
 func NewVideoHandler(repository *video.PostgresRepository, uploads *video.UploadService, publication *video.PublicationService, auth *Authenticator, logger *slog.Logger) *VideoHandler {
 	return &VideoHandler{repository: repository, uploads: uploads, publication: publication, auth: auth, logger: logger}
 }
 
+// RegisterRoutes registers authenticated video mutation endpoints and the unauthenticated public-video lookup endpoint on router.
 func (handler *VideoHandler) RegisterRoutes(router gin.IRouter) {
 	router.POST("/api/v1/videos", handler.auth.Require(), handler.createDraft)
 	router.POST("/api/v1/videos/:video_id/uploads", handler.auth.Require(), handler.createUpload)
@@ -32,6 +34,7 @@ func (handler *VideoHandler) RegisterRoutes(router gin.IRouter) {
 	router.GET("/api/v1/videos/:video_id", handler.getPublicVideo)
 }
 
+// reviewVideo applies an approved or rejected moderation decision at the expected video version and returns the updated video.
 func (handler *VideoHandler) reviewVideo(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
@@ -52,6 +55,7 @@ func (handler *VideoHandler) reviewVideo(context *gin.Context) {
 	httpx.WriteJSON(writer, http.StatusOK, map[string]any{"video": result})
 }
 
+// withdrawVideo withdraws a video at the expected version on behalf of the authenticated principal and returns the updated video.
 func (handler *VideoHandler) withdrawVideo(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
@@ -71,6 +75,7 @@ func (handler *VideoHandler) withdrawVideo(context *gin.Context) {
 	httpx.WriteJSON(writer, http.StatusOK, map[string]any{"video": result})
 }
 
+// getPublicVideo returns the published video identified by the route parameter, or a mapped API error if it is unavailable.
 func (handler *VideoHandler) getPublicVideo(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	result, err := handler.publication.GetPublic(request.Context(), context.Param("video_id"))
@@ -81,6 +86,7 @@ func (handler *VideoHandler) getPublicVideo(context *gin.Context) {
 	httpx.WriteJSON(writer, http.StatusOK, map[string]any{"video": result})
 }
 
+// createDraft creates a video draft owned by the authenticated principal and responds with the draft and HTTP 201.
 func (handler *VideoHandler) createDraft(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
@@ -100,6 +106,7 @@ func (handler *VideoHandler) createDraft(context *gin.Context) {
 	httpx.WriteJSON(writer, http.StatusCreated, map[string]any{"video": draft})
 }
 
+// createUpload creates an upload grant for the authenticated creator's video using the requested size, media type, and SHA-256 checksum.
 func (handler *VideoHandler) createUpload(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
@@ -123,6 +130,7 @@ func (handler *VideoHandler) createUpload(context *gin.Context) {
 	httpx.WriteJSON(writer, http.StatusCreated, map[string]any{"upload": grant})
 }
 
+// finalizeUpload completes the authenticated creator's upload for the specified video and returns the service result.
 func (handler *VideoHandler) finalizeUpload(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
@@ -134,6 +142,7 @@ func (handler *VideoHandler) finalizeUpload(context *gin.Context) {
 	httpx.WriteJSON(writer, http.StatusOK, result)
 }
 
+// writeError maps known video-domain errors to stable HTTP statuses and API codes, logging unexpected errors before returning HTTP 500.
 func (handler *VideoHandler) writeError(writer http.ResponseWriter, request *http.Request, err error) {
 	switch {
 	case errors.Is(err, video.ErrInvalidUpload), errors.Is(err, video.ErrInvalidTransition):

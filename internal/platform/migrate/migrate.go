@@ -33,6 +33,7 @@ type Applied struct {
 	AppliedAt time.Time
 }
 
+// Bundled loads and validates the SQL migrations embedded in the package.
 func Bundled() ([]Migration, error) {
 	root, err := fs.Sub(bundled, "migrations")
 	if err != nil {
@@ -41,6 +42,7 @@ func Bundled() ([]Migration, error) {
 	return Load(root)
 }
 
+// Load reads migration files from files, rejecting invalid filenames and duplicate versions, and returns their contents and SHA-256 checksums sorted by version.
 func Load(files fs.FS) ([]Migration, error) {
 	entries, err := fs.ReadDir(files, ".")
 	if err != nil {
@@ -80,6 +82,7 @@ func Load(files fs.FS) ([]Migration, error) {
 	return migrations, nil
 }
 
+// Apply serializes migration runs with a PostgreSQL advisory lock, creates the tracking table, and transactionally applies migrations whose versions are not already recorded. It returns the number committed during this call and stops on any error or checksum mismatch without reverting earlier commits.
 func Apply(ctx context.Context, database *sql.DB, migrations []Migration) (int, error) {
 	connection, err := database.Conn(ctx)
 	if err != nil {
@@ -143,6 +146,7 @@ func Apply(ctx context.Context, database *sql.DB, migrations []Migration) (int, 
 	return applied, nil
 }
 
+// Status returns recorded migrations ordered by version, or an error if the tracking table cannot be queried or its rows cannot be read.
 func Status(ctx context.Context, database *sql.DB) ([]Applied, error) {
 	rows, err := database.QueryContext(ctx, `
 		SELECT version, name, checksum, applied_at

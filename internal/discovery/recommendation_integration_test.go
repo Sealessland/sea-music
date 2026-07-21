@@ -8,6 +8,7 @@ import (
 	"github.com/sealessland/sea-music/internal/discovery"
 )
 
+// TestRecommendationUsesExplicitSignalsAndColdStartDiversity verifies that recommendations initially return three category-diverse recent videos with cold-start reasons, then prioritize a followed creator after the viewer follows and likes that creator's video.
 func TestRecommendationUsesExplicitSignalsAndColdStartDiversity(t *testing.T) {
 	database := discoveryTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

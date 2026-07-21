@@ -26,6 +26,7 @@ type BacklogStats struct {
 	OldestSeconds float64
 }
 
+// Backlog returns counts by active outbox state and the age in seconds of the oldest pending or publishing event.
 func (repository *PostgresRepository) Backlog(ctx context.Context) (BacklogStats, error) {
 	var stats BacklogStats
 	err := repository.database.QueryRowContext(ctx, `
@@ -41,6 +42,7 @@ func (repository *PostgresRepository) Backlog(ctx context.Context) (BacklogStats
 	return stats, nil
 }
 
+// ClaimBatch atomically leases up to limit eligible outbox events to dispatcherID, including expired leases, and increments each event's attempt count.
 func (repository *PostgresRepository) ClaimBatch(ctx context.Context, dispatcherID string, limit int, leaseDuration time.Duration) ([]OutboxEvent, error) {
 	if strings.TrimSpace(dispatcherID) == "" || limit <= 0 || limit > 1000 || leaseDuration <= 0 {
 		return nil, errors.New("invalid outbox claim request")
@@ -93,6 +95,7 @@ func (repository *PostgresRepository) ClaimBatch(ctx context.Context, dispatcher
 	return claimed, nil
 }
 
+// MarkPublished marks a publishing event as published and clears its lease and last error, returning an error if dispatcherID no longer owns the lease.
 func (repository *PostgresRepository) MarkPublished(ctx context.Context, eventID, dispatcherID string) error {
 	now := time.Now().UTC()
 	result, err := repository.database.ExecContext(ctx, `
@@ -114,6 +117,7 @@ func (repository *PostgresRepository) MarkPublished(ctx context.Context, eventID
 	return nil
 }
 
+// FailDelivery records a truncated delivery error, clears the owned lease, and either schedules the event after backoff or marks it failed when attempts are exhausted.
 func (repository *PostgresRepository) FailDelivery(ctx context.Context, event OutboxEvent, dispatcherID string, cause error, backoff time.Duration) error {
 	message := strings.TrimSpace(cause.Error())
 	if len(message) > 2000 {
@@ -154,6 +158,7 @@ type KafkaPublisher struct {
 	client *kgo.Client
 }
 
+// NewKafkaPublisher creates a traced Kafka producer for the supplied brokers with automatic topic creation and unlimited unknown-topic retries.
 func NewKafkaPublisher(brokers []string) (*KafkaPublisher, error) {
 	if len(brokers) == 0 {
 		return nil, errors.New("at least one Kafka broker is required")
@@ -195,10 +200,12 @@ func (publisher *KafkaPublisher) Publish(ctx context.Context, event OutboxEvent)
 	return nil
 }
 
+// Ping checks connectivity to the configured Kafka cluster within ctx.
 func (publisher *KafkaPublisher) Ping(ctx context.Context) error {
 	return publisher.client.Ping(ctx)
 }
 
+// Close shuts down the Kafka client and releases its resources.
 func (publisher *KafkaPublisher) Close() {
 	publisher.client.Close()
 }
@@ -211,10 +218,12 @@ type Dispatcher struct {
 	leaseDuration time.Duration
 }
 
+// NewDispatcher creates a dispatcher that claims batches under dispatcherID using the specified batch size and lease duration.
 func NewDispatcher(repository *PostgresRepository, publisher Publisher, dispatcherID string, batchSize int, leaseDuration time.Duration) *Dispatcher {
 	return &Dispatcher{repository: repository, publisher: publisher, dispatcherID: dispatcherID, batchSize: batchSize, leaseDuration: leaseDuration}
 }
 
+// RunOnce claims and publishes one batch sequentially, stopping at the first error and returning the number marked published; publish failures are rescheduled with capped exponential backoff or marked failed after the final attempt.
 func (dispatcher *Dispatcher) RunOnce(ctx context.Context) (int, error) {
 	batch, err := dispatcher.repository.ClaimBatch(ctx, dispatcher.dispatcherID, dispatcher.batchSize, dispatcher.leaseDuration)
 	if err != nil {

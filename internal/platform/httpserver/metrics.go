@@ -17,6 +17,7 @@ type HTTPMetrics struct {
 
 var defaultHTTPMetrics = newHTTPMetrics(platformmetrics.Registry)
 
+// newHTTPMetrics creates and registers HTTP request count, 5xx response count, and request-duration histogram collectors labeled by method, route, and status_class, panicking if registration fails.
 func newHTTPMetrics(registerer prometheus.Registerer) *HTTPMetrics {
 	labels := []string{"method", "route", "status_class"}
 	metrics := &HTTPMetrics{
@@ -38,6 +39,7 @@ func newHTTPMetrics(registerer prometheus.Registerer) *HTTPMetrics {
 	return metrics
 }
 
+// recordHTTPRequest records a request against the default collectors, using "unmatched" for an empty route, incrementing the error counter for 5xx statuses, and always observing the request duration in the histogram.
 func recordHTTPRequest(method, route string, status int, duration time.Duration) {
 	if route == "" {
 		route = "unmatched"

@@ -16,6 +16,7 @@ import (
 	platformmetrics "github.com/sealessland/sea-music/internal/platform/metrics"
 )
 
+// TestLivenessDoesNotDependOnReadiness verifies that liveness remains successful when the dependency check fails while readiness returns a service_unavailable error.
 func TestLivenessDoesNotDependOnReadiness(t *testing.T) {
 	handler := httpserver.NewHandler(discardLogger(), checkerFunc(func(context.Context) error {
 		return errors.New("database unavailable")
@@ -35,6 +36,7 @@ func TestLivenessDoesNotDependOnReadiness(t *testing.T) {
 	assertErrorCode(t, ready.Body.Bytes(), "service_unavailable")
 }
 
+// TestRequestIDIsPreservedAndReturnedWithErrors verifies that a client-supplied request ID is preserved in both the response header and a not-found error body.
 func TestRequestIDIsPreservedAndReturnedWithErrors(t *testing.T) {
 	handler := httpserver.NewHandler(discardLogger(), checkerFunc(func(context.Context) error { return nil }))
 	req := httptest.NewRequest(http.MethodGet, "/missing", nil)
@@ -60,6 +62,7 @@ func TestRequestIDIsPreservedAndReturnedWithErrors(t *testing.T) {
 	}
 }
 
+// TestRequestIDIsGenerated verifies that requests without an ID receive a nonempty X-Request-ID response header.
 func TestRequestIDIsGenerated(t *testing.T) {
 	handler := httpserver.NewHandler(discardLogger(), checkerFunc(func(context.Context) error { return nil }))
 	response := httptest.NewRecorder()
@@ -70,6 +73,7 @@ func TestRequestIDIsGenerated(t *testing.T) {
 	}
 }
 
+// TestHTTPMetricsUseBoundedRoutePatternNotResourceID verifies that standard request metrics label dynamic routes by their bounded pattern without exposing resource IDs.
 func TestHTTPMetricsUseBoundedRoutePatternNotResourceID(t *testing.T) {
 	handler := httpserver.NewHandler(discardLogger(), checkerFunc(func(context.Context) error { return nil }), func(router gin.IRouter) {
 		router.GET("/things/:id", func(context *gin.Context) { context.Status(http.StatusNoContent) })
@@ -88,6 +92,7 @@ func TestHTTPMetricsUseBoundedRoutePatternNotResourceID(t *testing.T) {
 	}
 }
 
+// TestCORSIsExactAllowlistAndSecurityHeadersAreAlwaysSet verifies that only exact allowed origins receive CORS access, disallowed preflights return 403, and security headers remain present for blocked origins.
 func TestCORSIsExactAllowlistAndSecurityHeadersAreAlwaysSet(t *testing.T) {
 	handler := httpserver.NewHandlerWithOrigins(discardLogger(), checkerFunc(func(context.Context) error { return nil }), []string{"https://app.example.com"})
 	allowedRequest := httptest.NewRequest(http.MethodOptions, "/api/v1/videos", nil)
@@ -115,6 +120,7 @@ func TestCORSIsExactAllowlistAndSecurityHeadersAreAlwaysSet(t *testing.T) {
 	}
 }
 
+// assertErrorCode decodes an error response and reports a fatal test failure for invalid JSON or a nonfatal failure when its code differs from want.
 func assertErrorCode(t *testing.T, data []byte, want string) {
 	t.Helper()
 	var body struct {
@@ -132,8 +138,10 @@ func assertErrorCode(t *testing.T, data []byte, want string) {
 
 type checkerFunc func(context.Context) error
 
+// Check delegates the readiness check to f with the supplied context and returns its error unchanged.
 func (f checkerFunc) Check(ctx context.Context) error { return f(ctx) }
 
+// discardLogger returns a JSON slog logger that discards all emitted records.
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewJSONHandler(io.Discard, nil))
 }

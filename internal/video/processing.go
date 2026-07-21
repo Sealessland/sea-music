@@ -47,10 +47,12 @@ type FFmpegProcessor struct {
 
 const renditionScaleFilter = "scale=1280:-2:force_original_aspect_ratio=decrease:force_divisible_by=2"
 
+// NewFFmpegProcessor constructs a processor that uses the given object store, media executables, operation timeout, and download-size limit.
 func NewFFmpegProcessor(store *S3ObjectStore, ffprobe, ffmpeg string, timeout time.Duration, maxBytes int64) *FFmpegProcessor {
 	return &FFmpegProcessor{store: store, ffprobe: ffprobe, ffmpeg: ffmpeg, timeout: timeout, maxBytes: maxBytes}
 }
 
+// Process downloads and validates the source video, creates playback and cover renditions in a temporary workspace, uploads them under the asset's versioned prefix, and removes local files on return.
 func (processor *FFmpegProcessor) Process(ctx context.Context, input ProcessingInput) ([]Rendition, error) {
 	ctx, span := otel.Tracer("sea-music/video").Start(ctx, "media.process")
 	span.SetAttributes(attribute.String("media.job_id", input.Job.ID), attribute.String("media.asset_id", input.Job.SourceAssetID))
@@ -111,6 +113,7 @@ type probeMetadata struct {
 	Height int
 }
 
+// probe runs ffprobe to obtain the first video stream's dimensions and rejects missing or invalid dimensions and durations outside the range (0, 12 hours].
 func (processor *FFmpegProcessor) probe(ctx context.Context, source string) (probeMetadata, error) {
 	ctx, span := otel.Tracer("sea-music/video").Start(ctx, "ffprobe")
 	defer span.End()
@@ -143,6 +146,7 @@ func (processor *FFmpegProcessor) probe(ctx context.Context, source string) (pro
 	return probeMetadata{Width: result.Streams[0].Width, Height: result.Streams[0].Height}, nil
 }
 
+// runMediaCommand executes a traced media subprocess, returning the context error on cancellation or a bounded-output diagnostic on command failure.
 func runMediaCommand(ctx context.Context, executable string, arguments ...string) error {
 	ctx, span := otel.Tracer("sea-music/video").Start(ctx, "media.command")
 	span.SetAttributes(attribute.String("process.executable.name", filepath.Base(executable)))
@@ -160,6 +164,7 @@ func runMediaCommand(ctx context.Context, executable string, arguments ...string
 	return nil
 }
 
+// mediaCommandError wraps a subprocess error with the executable's base name and trimmed combined output truncated to 1,000 bytes.
 func mediaCommandError(executable string, output []byte, err error) error {
 	message := strings.TrimSpace(string(output))
 	if len(message) > 1000 {
@@ -175,10 +180,12 @@ type ProcessingService struct {
 	leaseDuration time.Duration
 }
 
+// NewProcessingService constructs a worker that claims jobs from repository, processes them, and maintains leases under workerID for leaseDuration.
 func NewProcessingService(repository *PostgresRepository, processor *FFmpegProcessor, workerID string, leaseDuration time.Duration) *ProcessingService {
 	return &ProcessingService{repository: repository, processor: processor, workerID: workerID, leaseDuration: leaseDuration}
 }
 
+// RunOnce claims and starts one processing job, renews its lease while processing, then completes it or records a retryable failure; lease-renewal errors cancel processing and take precedence.
 func (service *ProcessingService) RunOnce(ctx context.Context) (ProcessingResult, error) {
 	job, err := service.repository.ClaimProcessingJob(ctx, service.workerID, service.leaseDuration)
 	if err != nil {
@@ -207,6 +214,7 @@ func (service *ProcessingService) RunOnce(ctx context.Context) (ProcessingResult
 	return service.repository.CompleteProcessingJob(ctx, job.ID, service.workerID, renditions)
 }
 
+// renewLease extends the job lease every third of the lease duration until cancellation, canceling processing and reporting the first renewal error.
 func (service *ProcessingService) renewLease(ctx context.Context, cancel context.CancelFunc, jobID string, result chan<- error) {
 	interval := service.leaseDuration / 3
 	if interval <= 0 {

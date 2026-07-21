@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="390" viewBox="0 0 1280 390" role="img" aria-labelledby="title desc">
+  <title id="title">Sea Music 代码行数火焰图</title>
+  <desc id="desc">按目录聚合的 22,972 行受 Git 跟踪源代码，其中 internal 目录占 15,564 行。</desc>
+  <defs>
+    <linearGradient id="canvas" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#100b2b"/>
+      <stop offset="0.55" stop-color="#241044"/>
+      <stop offset="1" stop-color="#40142e"/>
+    </linearGradient>
+    <linearGradient id="root" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff4d6d"/>
+      <stop offset="0.5" stop-color="#ff7a45"/>
+      <stop offset="1" stop-color="#ffc145"/>
+    </linearGradient>
+    <linearGradient id="hot" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ff5f6d"/>
+      <stop offset="1" stop-color="#ff9966"/>
+    </linearGradient>
+    <linearGradient id="warm" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#f857a6"/>
+      <stop offset="1" stop-color="#ff7b54"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ff8a00"/>
+      <stop offset="1" stop-color="#ffd36a"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-50%" width="140%" height="200%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow" x="-10%" y="-30%" width="120%" height="170%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#09051a" flood-opacity="0.55"/>
+    </filter>
+    <style>
+      .frame { stroke: rgba(255,255,255,.18); stroke-width: 1; }
+      .tile { transition: opacity .18s ease, filter .18s ease; }
+      .tile:hover { opacity: .82; filter: url(#glow); }
+      .label { fill: #fff; font: 600 13px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; pointer-events: none; }
+      .small { font-size: 11px; }
+      .muted { fill: #c9bddc; font: 12px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="390" rx="24" fill="url(#canvas)"/>
+  <circle cx="1120" cy="58" r="145" fill="#ff5e62" opacity=".07"/>
+  <circle cx="1190" cy="25" r="82" fill="#ffd166" opacity=".08"/>
+
+  <g transform="translate(60 42)">
+    <text class="label" x="0" y="0" font-size="24">CODE LINES · FLAME GRAPH</text>
+    <text class="muted" x="0" y="25">按目录聚合 · Git tracked source · 22,972 LOC</text>
+    <g transform="translate(936 -14)">
+      <rect width="164" height="44" rx="22" fill="#ffffff" opacity=".1" stroke="#ffffff" stroke-opacity=".2"/>
+      <circle cx="23" cy="22" r="7" fill="#ffbd59" filter="url(#glow)"/>
+      <text class="label" x="42" y="27">137 Go files</text>
+    </g>
+  </g>
+
+  <!-- internal packages -->
+  <g transform="translate(60 145)" filter="url(#shadow)">
+    <g class="tile"><title>internal/platform · 2,804 LOC · 12.2%</title><rect class="frame" x="0" y="0" width="141.6" height="56" rx="9" fill="url(#gold)"/><text class="label" x="10" y="25">platform</text><text class="label small" x="10" y="43" opacity=".82">2,804</text></g>
+    <g class="tile"><title>internal/moderation · 2,531 LOC · 11.0%</title><rect class="frame" x="141.6" y="0" width="127.8" height="56" rx="9" fill="url(#warm)"/><text class="label" x="151.6" y="25">moderation</text><text class="label small" x="151.6" y="43" opacity=".82">2,531</text></g>
+    <g class="tile"><title>internal/appapi · 2,256 LOC · 9.8%</title><rect class="frame" x="269.4" y="0" width="113.9" height="56" rx="9" fill="url(#hot)"/><text class="label" x="279.4" y="25">appapi</text><text class="label small" x="279.4" y="43" opacity=".82">2,256</text></g>
+    <g class="tile"><title>internal/video · 2,189 LOC · 9.5%</title><rect class="frame" x="383.3" y="0" width="110.5" height="56" rx="9" fill="url(#gold)"/><text class="label" x="393.3" y="25">video</text><text class="label small" x="393.3" y="43" opacity=".82">2,189</text></g>
+    <g class="tile"><title>internal/social · 1,289 LOC · 5.6%</title><rect class="frame" x="493.8" y="0" width="65.1" height="56" rx="8" fill="url(#warm)"/><text class="label small" x="500.8" y="25">social</text><text class="label small" x="500.8" y="42" opacity=".82">1,289</text></g>
+    <g class="tile"><title>internal/events · 1,253 LOC · 5.5%</title><rect class="frame" x="558.9" y="0" width="63.3" height="56" rx="8" fill="url(#hot)"/><text class="label small" x="565.9" y="25">events</text><text class="label small" x="565.9" y="42" opacity=".82">1,253</text></g>
+    <g class="tile"><title>internal/gen · 1,237 LOC · 5.4%</title><rect class="frame" x="622.2" y="0" width="62.5" height="56" rx="8" fill="url(#gold)"/><text class="label small" x="629.2" y="25">gen</text><text class="label small" x="629.2" y="42" opacity=".82">1,237</text></g>
+    <g class="tile"><title>internal/discovery · 988 LOC · 4.3%</title><rect class="frame" x="684.7" y="0" width="49.9" height="56" rx="8" fill="url(#warm)"/><text class="label small" x="691.7" y="32">disc.</text></g>
+    <g class="tile"><title>internal/identity · 878 LOC · 3.8%</title><rect class="frame" x="734.6" y="0" width="44.3" height="56" rx="8" fill="url(#hot)"/><text class="label small" x="741.6" y="32">id.</text></g>
+    <g class="tile"><title>internal/architecture · 139 LOC · 0.6%</title><rect class="frame" x="778.9" y="0" width="7" height="56" rx="3.5" fill="#ffd166"/></g>
+  </g>
+
+  <!-- top-level directories -->
+  <g transform="translate(60 208)" filter="url(#shadow)">
+    <g class="tile"><title>internal · 15,564 LOC · 67.8%</title><rect class="frame" x="0" y="0" width="785.9" height="60" rx="10" fill="url(#hot)"/><text class="label" x="14" y="27">internal</text><text class="label small" x="14" y="46" opacity=".84">15,564 LOC · 67.8%</text></g>
+    <g class="tile"><title>docs · 4,624 LOC · 20.1%</title><rect class="frame" x="785.9" y="0" width="233.5" height="60" rx="10" fill="url(#warm)"/><text class="label" x="799.9" y="27">docs</text><text class="label small" x="799.9" y="46" opacity=".84">4,624 · 20.1%</text></g>
+    <g class="tile"><title>cmd · 1,376 LOC · 6.0%</title><rect class="frame" x="1019.4" y="0" width="69.5" height="60" rx="9" fill="url(#gold)"/><text class="label small" x="1027.4" y="27">cmd</text><text class="label small" x="1027.4" y="45" opacity=".84">1,376</text></g>
+    <g class="tile"><title>scripts · 1,146 LOC · 5.0%</title><rect class="frame" x="1088.9" y="0" width="57.9" height="60" rx="9" fill="url(#hot)"/><text class="label small" x="1095.9" y="27">scripts</text><text class="label small" x="1095.9" y="45" opacity=".84">1,146</text></g>
+    <g class="tile"><title>benchmarks · 154 LOC · 0.7%</title><rect class="frame" x="1146.8" y="0" width="7.8" height="60" rx="3.9" fill="#ff9f43"/></g>
+    <g class="tile"><title>api · 108 LOC · 0.5%</title><rect class="frame" x="1154.6" y="0" width="5.4" height="60" rx="2.7" fill="#ffd166"/></g>
+  </g>
+
+  <!-- repository root -->
+  <g transform="translate(60 276)" filter="url(#shadow)">
+    <g class="tile"><title>Sea Music · 22,972 LOC · 100%</title><rect class="frame" width="1160" height="68" rx="12" fill="url(#root)"/><text class="label" x="18" y="31" font-size="16">sea-music</text><text class="label" x="18" y="51" opacity=".84">22,972 lines · 100%</text><text class="label" x="1138" y="41" text-anchor="end" font-size="20">🔥</text></g>
+  </g>
+  <text class="muted" x="60" y="371">Go · HTML · Shell · JavaScript · SQL · CSS · Proto · jq</text>
+  <text class="muted" x="1220" y="371" text-anchor="end">矩形宽度 = 代码行数</text>
+</svg>

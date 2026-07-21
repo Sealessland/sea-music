@@ -10,6 +10,7 @@ import (
 //go:embed fixtures/*.sql
 var files embed.FS
 
+// ApplyBaseline executes the embedded baseline SQL in a transaction, rolling it back on execution or commit failure.
 func ApplyBaseline(ctx context.Context, database *sql.DB) error {
 	statement, err := files.ReadFile("fixtures/baseline.sql")
 	if err != nil {

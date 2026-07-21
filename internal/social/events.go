@@ -22,6 +22,7 @@ type OutboxWriter interface {
 
 type OutboxWriterFunc func(context.Context, *sql.Tx, DomainEvent) (string, error)
 
+// Enqueue delegates the outbox write to the wrapped function and returns its event ID and error unchanged.
 func (function OutboxWriterFunc) Enqueue(ctx context.Context, transaction *sql.Tx, event DomainEvent) (string, error) {
 	return function(ctx, transaction, event)
 }

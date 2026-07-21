@@ -14,6 +14,7 @@ import (
 	"github.com/sealessland/sea-music/internal/social"
 )
 
+// TestLikeFollowAndFavoriteAreIdempotentAndEmitOnlyChanges verifies that repeated likes remain unique and unchanged requests emit no outbox event, while new likes, follows, and favorites each emit one.
 func TestLikeFollowAndFavoriteAreIdempotentAndEmitOnlyChanges(t *testing.T) {
 	database := socialTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -43,6 +44,7 @@ func TestLikeFollowAndFavoriteAreIdempotentAndEmitOnlyChanges(t *testing.T) {
 	}
 }
 
+// TestConcurrentLikeAndUnlikePreserveUniqueAuthoritativeRelation verifies that concurrent opposing like updates complete without error and leave at most one authoritative user-video relation.
 func TestConcurrentLikeAndUnlikePreserveUniqueAuthoritativeRelation(t *testing.T) {
 	database := socialTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -75,6 +77,7 @@ func TestConcurrentLikeAndUnlikePreserveUniqueAuthoritativeRelation(t *testing.T
 	}
 }
 
+// socialRepository constructs a PostgreSQL social repository whose domain events are atomically enqueued in the eventing outbox with UTC occurrence times.
 func socialRepository(database *sql.DB) *social.PostgresRepository {
 	eventRepository := events.NewPostgresRepository(database)
 	writer := social.OutboxWriterFunc(func(ctx context.Context, transaction *sql.Tx, event social.DomainEvent) (string, error) {
@@ -88,6 +91,7 @@ func socialRepository(database *sql.DB) *social.PostgresRepository {
 	return social.NewPostgresRepository(database).WithOutbox(writer)
 }
 
+// socialTestDatabase opens the database named by SEA_SOCIAL_TEST_DATABASE_URL, skips when unset, applies bundled migrations, truncates test tables, and registers cleanup for the connection and timeout context.
 func socialTestDatabase(t *testing.T) *sql.DB {
 	t.Helper()
 	url := os.Getenv("SEA_SOCIAL_TEST_DATABASE_URL")
@@ -114,6 +118,7 @@ func socialTestDatabase(t *testing.T) *sql.DB {
 	return database
 }
 
+// insertSocialFixture inserts two users and a published video owned by the second user, returning both user IDs followed by the video ID and failing the test on any insert error.
 func insertSocialFixture(t *testing.T, ctx context.Context, database *sql.DB) (string, string, string) {
 	t.Helper()
 	var first, second, videoID string

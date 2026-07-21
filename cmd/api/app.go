@@ -133,6 +133,7 @@ func run() error {
 	return httpserver.Run(ctx, server, cfg.HTTP.ShutdownTimeout, logger)
 }
 
+// openDatabase creates an OpenTelemetry-instrumented PostgreSQL pool with configured limits and verifies connectivity within the readiness timeout, closing the pool on ping failure.
 func openDatabase(cfg config.Config) (*sql.DB, error) {
 	connectionConfig, err := pgx.ParseConfig(cfg.Database.URL)
 	if err != nil {
@@ -152,6 +153,7 @@ func openDatabase(cfg config.Config) (*sql.DB, error) {
 	return database, nil
 }
 
+// openRedis creates a traced Redis client and verifies connectivity within the readiness timeout derived from ctx, closing the client if instrumentation or ping fails.
 func openRedis(ctx context.Context, cfg config.Config) (*redis.Client, error) {
 	options, err := redis.ParseURL(cfg.Redis.URL)
 	if err != nil {

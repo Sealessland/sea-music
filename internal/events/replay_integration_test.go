@@ -10,6 +10,7 @@ import (
 	"github.com/sealessland/sea-music/internal/events"
 )
 
+// TestReplayOutboxEventResetsFailedEventForRedispatch verifies that an admin replay resets a failed outbox event to an immediately claimable pending state, clearing attempts, lease metadata, and the last error.
 func TestReplayOutboxEventResetsFailedEventForRedispatch(t *testing.T) {
 	database := eventsTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -49,6 +50,7 @@ func TestReplayOutboxEventResetsFailedEventForRedispatch(t *testing.T) {
 	}
 }
 
+// TestReplayOutboxEventRejectsNonFailedOrMissingEvents verifies that replay requires an admin role and returns distinct errors for pending and nonexistent outbox events.
 func TestReplayOutboxEventRejectsNonFailedOrMissingEvents(t *testing.T) {
 	database := eventsTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

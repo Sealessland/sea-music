@@ -10,6 +10,7 @@ import (
 	"github.com/sealessland/sea-music/internal/discovery"
 )
 
+// TestAllDiscoveryFeedsFilterBlockedAndWithdrawnCandidates verifies that Following and Redis-ranked Hot feeds exclude blocked creators and that Hot revalidates cached candidates to exclude withdrawn videos.
 func TestAllDiscoveryFeedsFilterBlockedAndWithdrawnCandidates(t *testing.T) {
 	database := discoveryTestDatabase(t)
 	options, err := redis.ParseURL(os.Getenv("SEA_REDIS_TEST_URL"))

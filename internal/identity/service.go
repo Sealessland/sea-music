@@ -68,6 +68,7 @@ type Repository interface {
 	RotateSession(context.Context, []byte, []byte, time.Time, time.Time) (User, string, error)
 }
 
+// CurrentUser retrieves the user identified by userID from the repository.
 func (s *Service) CurrentUser(ctx context.Context, userID string) (User, error) {
 	return s.repository.FindUser(ctx, userID)
 }
@@ -85,17 +86,20 @@ type Service struct {
 	dummyHash  string
 }
 
+// NewService creates an identity service with password hashing and a precomputed dummy hash that reduces login timing differences for unknown identities. The returned service has no token manager configured; call WithSessions before Login or Refresh.
 func NewService(repository Repository, passwords Passwords) *Service {
 	dummyHash, _ := passwords.Hash("dummy password value never accepted")
 	return &Service{repository: repository, passwords: passwords, dummyHash: dummyHash}
 }
 
+// WithSessions enables session-based login and refresh using tokens and refreshTTL, mutates the service, and returns it for chaining.
 func (s *Service) WithSessions(tokens *TokenManager, refreshTTL time.Duration) *Service {
 	s.tokens = tokens
 	s.refreshTTL = refreshTTL
 	return s
 }
 
+// Register normalizes the username and email, validates registration fields, hashes the password, and persists the new user via the repository.
 func (s *Service) Register(ctx context.Context, input RegisterInput) (User, error) {
 	username := strings.ToLower(strings.TrimSpace(input.Username))
 	email := strings.ToLower(strings.TrimSpace(input.Email))
@@ -117,6 +121,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (User, erro
 	return user, nil
 }
 
+// Login verifies normalized credentials, creates a refresh session, and returns a bearer token pair; unknown identities and password mismatches both yield ErrInvalidCredentials.
 func (s *Service) Login(ctx context.Context, input LoginInput) (TokenPair, error) {
 	if s.tokens == nil || s.refreshTTL <= 0 {
 		return TokenPair{}, errors.New("session service is not configured")
@@ -154,6 +159,7 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (TokenPair, error
 	return s.issuePair(credential.User, sessionID, rawRefresh, now)
 }
 
+// Refresh rotates a valid refresh token to a newly generated token, extends the session expiry, and returns a new bearer token pair.
 func (s *Service) Refresh(ctx context.Context, currentRefresh string) (TokenPair, error) {
 	if s.tokens == nil || s.refreshTTL <= 0 || currentRefresh == "" || len(currentRefresh) > 512 {
 		return TokenPair{}, ErrInvalidRefresh
@@ -171,6 +177,7 @@ func (s *Service) Refresh(ctx context.Context, currentRefresh string) (TokenPair
 	return s.issuePair(user, sessionID, rawRefresh, now)
 }
 
+// issuePair issues an access token for the user and session and packages it with the supplied refresh token and computed lifetime.
 func (s *Service) issuePair(user User, sessionID, refreshToken string, now time.Time) (TokenPair, error) {
 	accessToken, expiresAt, err := s.tokens.Issue(user, sessionID, now)
 	if err != nil {
@@ -184,6 +191,7 @@ func (s *Service) issuePair(user User, sessionID, refreshToken string, now time.
 	}, nil
 }
 
+// newRefreshToken generates a cryptographically random URL-safe refresh token and returns both its raw value and SHA-256 hash.
 func newRefreshToken() (string, []byte, error) {
 	var value [32]byte
 	if _, err := rand.Read(value[:]); err != nil {
@@ -194,6 +202,7 @@ func newRefreshToken() (string, []byte, error) {
 	return raw, hash[:], nil
 }
 
+// validateRegistration enforces the username format, canonical email syntax and length, and a password length of 12–128 bytes, wrapping failures with ErrInvalidRegistration.
 func validateRegistration(username, email, password string) error {
 	if !usernamePattern.MatchString(username) {
 		return fmt.Errorf("%w: username must be 3-32 lowercase letters, digits, or underscores", ErrInvalidRegistration)

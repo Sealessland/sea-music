@@ -19,6 +19,7 @@ type PasswordParams struct {
 	KeyBytes    uint32
 }
 
+// DefaultPasswordParams returns the recommended Argon2id cost, parallelism, salt, and key-size settings.
 func DefaultPasswordParams() PasswordParams {
 	return PasswordParams{
 		MemoryKiB:   64 * 1024,
@@ -33,10 +34,12 @@ type PasswordHasher struct {
 	params PasswordParams
 }
 
+// NewPasswordHasher returns a hasher that uses params for newly generated password hashes without validating them until Hash is called.
 func NewPasswordHasher(params PasswordParams) *PasswordHasher {
 	return &PasswordHasher{params: params}
 }
 
+// Hash validates the configured parameters, generates a cryptographically random salt, and returns an encoded Argon2id hash or an error if validation or salt generation fails.
 func (h *PasswordHasher) Hash(password string) (string, error) {
 	if err := validatePasswordParams(h.params); err != nil {
 		return "", err
@@ -56,6 +59,7 @@ func (h *PasswordHasher) Hash(password string) (string, error) {
 	), nil
 }
 
+// Verify parses the encoded Argon2id hash, derives a key from password using its embedded parameters, and compares the keys in constant time; malformed or unsafe hashes return an error.
 func (h *PasswordHasher) Verify(password, encoded string) (bool, error) {
 	params, salt, expected, err := parsePasswordHash(encoded)
 	if err != nil {
@@ -65,6 +69,7 @@ func (h *PasswordHasher) Verify(password, encoded string) (bool, error) {
 	return subtle.ConstantTimeCompare(actual, expected) == 1, nil
 }
 
+// parsePasswordHash decodes an Argon2id hash, requires the current Argon2 version and safety-bounded parameters, and returns its parameters, salt, and expected key.
 func parsePasswordHash(encoded string) (PasswordParams, []byte, []byte, error) {
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 6 || parts[1] != "argon2id" {
@@ -96,6 +101,7 @@ func parsePasswordHash(encoded string) (PasswordParams, []byte, []byte, error) {
 	return params, salt, expected, nil
 }
 
+// validatePasswordParams rejects Argon2id cost, parallelism, salt-size, or key-size values outside the supported safety bounds.
 func validatePasswordParams(params PasswordParams) error {
 	if params.MemoryKiB < 19*1024 || params.MemoryKiB > 1024*1024 || params.Iterations < 2 || params.Iterations > 10 || params.Parallelism < 1 || params.Parallelism > 16 || params.SaltBytes < 16 || params.SaltBytes > 64 || params.KeyBytes < 32 || params.KeyBytes > 64 {
 		return errors.New("password hash parameters outside safety bounds")

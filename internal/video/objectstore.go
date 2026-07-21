@@ -51,6 +51,7 @@ type cachedDownloadURL struct {
 
 const maxDownloadURLCacheEntries = 10_000
 
+// NewS3ObjectStore validates cfg and creates a path-style S3 store with static credentials, defaulting an empty region to us-east-1 and optionally caching presigned download URLs.
 func NewS3ObjectStore(ctx context.Context, cfg S3Config) (*S3ObjectStore, error) {
 	if strings.TrimSpace(cfg.Endpoint) == "" || strings.TrimSpace(cfg.Bucket) == "" || strings.TrimSpace(cfg.AccessKey) == "" || strings.TrimSpace(cfg.SecretKey) == "" {
 		return nil, errors.New("invalid S3 configuration")
@@ -75,6 +76,7 @@ func NewS3ObjectStore(ctx context.Context, cfg S3Config) (*S3ObjectStore, error)
 	}, nil
 }
 
+// PresignUpload returns a time-limited PUT URL that signs the given content type as a request header and records checksum as sha256 object metadata.
 func (store *S3ObjectStore) PresignUpload(ctx context.Context, key, contentType, checksum string, ttl time.Duration) (string, time.Time, error) {
 	expiresAt := time.Now().UTC().Add(ttl)
 	result, err := store.presigner.PresignPutObject(ctx, &s3.PutObjectInput{
@@ -87,6 +89,7 @@ func (store *S3ObjectStore) PresignUpload(ctx context.Context, key, contentType,
 	return result.URL, expiresAt, nil
 }
 
+// PresignDownload returns a time-limited GET URL, reusing a cached URL for the key when it remains valid for more than five seconds and evicting expired or arbitrary entries at the cache limit.
 func (store *S3ObjectStore) PresignDownload(ctx context.Context, key string, ttl time.Duration) (string, time.Time, error) {
 	ctx, span := otel.Tracer("sea-music/video").Start(ctx, "object_store.presign_download")
 	defer span.End()
@@ -130,12 +133,14 @@ func (store *S3ObjectStore) PresignDownload(ctx context.Context, key string, ttl
 	return result.URL, expiresAt, nil
 }
 
+// DownloadURLCacheSize returns the current number of cached presigned download URLs, including any expired entries not yet evicted.
 func (store *S3ObjectStore) DownloadURLCacheSize() int {
 	store.downloadCacheMu.Lock()
 	defer store.downloadCacheMu.Unlock()
 	return len(store.downloadCache)
 }
 
+// Inspect downloads and hashes the object, returning its size, content type, and SHA-256 checksum only when its declared and actual lengths agree and are within maxBytes; otherwise it returns ErrInvalidUpload.
 func (store *S3ObjectStore) Inspect(ctx context.Context, key string, maxBytes int64) (ObjectInspection, error) {
 	result, err := store.client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(store.bucket), Key: aws.String(key)})
 	if err != nil {
@@ -156,6 +161,7 @@ func (store *S3ObjectStore) Inspect(ctx context.Context, key string, maxBytes in
 	return ObjectInspection{SizeBytes: written, ContentType: aws.ToString(result.ContentType), ChecksumSHA256: hex.EncodeToString(hash.Sum(nil))}, nil
 }
 
+// Check verifies that the configured bucket is accessible with a HeadBucket request.
 func (store *S3ObjectStore) Check(ctx context.Context) error {
 	_, err := store.client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(store.bucket)})
 	if err != nil {
@@ -164,6 +170,7 @@ func (store *S3ObjectStore) Check(ctx context.Context) error {
 	return nil
 }
 
+// DownloadFile replaces destination with the object using mode 0600 after validating its declared size, and returns ErrInvalidUpload if the object is empty, oversized, truncated, or longer than declared.
 func (store *S3ObjectStore) DownloadFile(ctx context.Context, key, destination string, maxBytes int64) error {
 	result, err := store.client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(store.bucket), Key: aws.String(key)})
 	if err != nil {
@@ -191,6 +198,7 @@ func (store *S3ObjectStore) DownloadFile(ctx context.Context, key, destination s
 	return nil
 }
 
+// UploadFile opens source and uploads its contents to key with the specified content type.
 func (store *S3ObjectStore) UploadFile(ctx context.Context, key, contentType, source string) error {
 	file, err := os.Open(source)
 	if err != nil {

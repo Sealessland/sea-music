@@ -13,6 +13,7 @@ import (
 	"github.com/sealessland/sea-music/internal/social"
 )
 
+// TestDuplicateInteractionEventUpdatesPersistentAndCachedCountOnce verifies that inbox deduplication applies a repeated like event only once to both the persistent projection and Redis cache.
 func TestDuplicateInteractionEventUpdatesPersistentAndCachedCountOnce(t *testing.T) {
 	database := socialTestDatabase(t)
 	redisURL := os.Getenv("SEA_REDIS_TEST_URL")

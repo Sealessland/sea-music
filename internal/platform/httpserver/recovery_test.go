@@ -12,6 +12,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/httpserver"
 )
 
+// TestPanicRecoveryReturnsUnifiedError verifies that a panic yields a sanitized unified 500 response that preserves the client-supplied request ID in both the header and body without exposing panic details.
 func TestPanicRecoveryReturnsUnifiedError(t *testing.T) {
 	handler := httpserver.NewHandler(discardLogger(), checkerFunc(func(context.Context) error { return nil }), func(router gin.IRouter) {
 		router.GET("/panic", func(context *gin.Context) { panic("boom") })
@@ -49,6 +50,7 @@ func TestPanicRecoveryReturnsUnifiedError(t *testing.T) {
 	}
 }
 
+// TestPanicRecoveryGeneratesRequestID verifies that panic recovery generates a non-empty request ID when none is supplied and returns the same ID in the 500 response header and body.
 func TestPanicRecoveryGeneratesRequestID(t *testing.T) {
 	handler := httpserver.NewHandler(discardLogger(), checkerFunc(func(context.Context) error { return nil }), func(router gin.IRouter) {
 		router.GET("/panic", func(context *gin.Context) { panic("boom") })

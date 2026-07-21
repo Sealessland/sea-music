@@ -11,6 +11,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/migrate"
 )
 
+// main runs the migration command, reporting failures to standard error and exiting with status 1.
 func main() {
 	if err := run(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "migrate: %v\n", err)
@@ -18,6 +19,7 @@ func main() {
 	}
 }
 
+// run connects to the database named by SEA_DATABASE_URL, then applies bundled migrations by default or prints migration status as selected by the first argument ("up" or "status"). The entire operation is bounded by a 30-second context deadline; an unknown command or missing SEA_DATABASE_URL returns an error.
 func run() error {
 	databaseURL := os.Getenv("SEA_DATABASE_URL")
 	if databaseURL == "" {

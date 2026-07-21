@@ -14,6 +14,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/migrate"
 )
 
+// TestRegistrationPersistsArgon2HashAndRejectsDuplicateIdentity verifies that registration normalizes identity fields, assigns the member role, stores a verifiable Argon2id password hash, and rejects case-insensitive username or email conflicts.
 func TestRegistrationPersistsArgon2HashAndRejectsDuplicateIdentity(t *testing.T) {
 	database := identityTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -67,6 +68,7 @@ func TestRegistrationPersistsArgon2HashAndRejectsDuplicateIdentity(t *testing.T)
 	}
 }
 
+// TestRegistrationRejectsInvalidInputBeforePersistence verifies that malformed registration data (short username, invalid email, weak password) returns ErrInvalidRegistration and that no user row is persisted to the database.
 func TestRegistrationRejectsInvalidInputBeforePersistence(t *testing.T) {
 	database := identityTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -90,6 +92,7 @@ func TestRegistrationRejectsInvalidInputBeforePersistence(t *testing.T) {
 	}
 }
 
+// TestLoginRotatesRefreshTokensAndRevokesFamilyOnReplay verifies case-insensitive login, valid access claims, that the refresh token is stored only as a hash (not raw), token rotation on refresh, and complete session-family revocation — returning ErrRefreshReplay — when a revoked refresh token is reused.
 func TestLoginRotatesRefreshTokensAndRevokesFamilyOnReplay(t *testing.T) {
 	database := identityTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -154,6 +157,7 @@ func TestLoginRotatesRefreshTokensAndRevokesFamilyOnReplay(t *testing.T) {
 	}
 }
 
+// TestLoginRejectsInvalidCredentials verifies that login for an unknown identity return ErrInvalidCredentials, distinguishing this from persistence or token failures.
 func TestLoginRejectsInvalidCredentials(t *testing.T) {
 	database := identityTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -169,6 +173,7 @@ func TestLoginRejectsInvalidCredentials(t *testing.T) {
 	}
 }
 
+// identityTestDatabase opens the configured PostgreSQL integration database, applies bundled migrations, clears identity data, registers cleanup, and skips the test when no database URL is set.
 func identityTestDatabase(t *testing.T) *sql.DB {
 	t.Helper()
 	databaseURL := os.Getenv("SEA_IDENTITY_TEST_DATABASE_URL")

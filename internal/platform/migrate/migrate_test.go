@@ -7,6 +7,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/migrate"
 )
 
+// TestLoadOrdersMigrationsAndCalculatesStableChecksums verifies that Load sorts migrations by version and produces nonempty, deterministic checksums across repeated loads.
 func TestLoadOrdersMigrationsAndCalculatesStableChecksums(t *testing.T) {
 	files := fstest.MapFS{
 		"0002_second.sql": {Data: []byte("select 2;\n")},
@@ -33,6 +34,7 @@ func TestLoadOrdersMigrationsAndCalculatesStableChecksums(t *testing.T) {
 	}
 }
 
+// TestLoadRejectsInvalidFileName verifies that Load returns an error for a migration filename without the required version prefix.
 func TestLoadRejectsInvalidFileName(t *testing.T) {
 	_, err := migrate.Load(fstest.MapFS{
 		"initial.sql": {Data: []byte("select 1;")},
@@ -42,6 +44,7 @@ func TestLoadRejectsInvalidFileName(t *testing.T) {
 	}
 }
 
+// TestLoadRejectsDuplicateVersion verifies that Load returns an error when multiple migration files declare the same version.
 func TestLoadRejectsDuplicateVersion(t *testing.T) {
 	_, err := migrate.Load(fstest.MapFS{
 		"0001_first.sql":  {Data: []byte("select 1;")},

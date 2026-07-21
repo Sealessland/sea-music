@@ -21,10 +21,12 @@ type ReplayService struct {
 	publisher  Publisher
 }
 
+// NewReplayService creates a service that reads dead letters from repository storage and republishes them through publisher.
 func NewReplayService(repository *PostgresRepository, publisher Publisher) *ReplayService {
 	return &ReplayService{repository: repository, publisher: publisher}
 }
 
+// Replay republishes a validated quarantined dead letter for an admin, then marks it replayed; publication can succeed even if the subsequent status update fails.
 func (service *ReplayService) Replay(ctx context.Context, deadLetterID, actorRole string) error {
 	if actorRole != "admin" {
 		return ErrReplayForbidden

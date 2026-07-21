@@ -11,6 +11,7 @@ import (
 	"github.com/sealessland/sea-music/internal/events"
 )
 
+// TestAckWindowCrashRepublishesStableIDAndInboxDeduplicates verifies that an event published before a dispatcher crash is republished with the same ID after its lease expires, clears the outbox backlog, and is applied exactly once through inbox deduplication.
 func TestAckWindowCrashRepublishesStableIDAndInboxDeduplicates(t *testing.T) {
 	database := eventsTestDatabase(t)
 	broker := os.Getenv("SEA_EVENTS_TEST_BROKER")

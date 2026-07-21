@@ -13,6 +13,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/migrate"
 )
 
+// TestBusinessWriteAndOutboxEventRollbackAtomically verifies that rolling back a shared transaction persists neither the inserted user nor its enqueued outbox event.
 func TestBusinessWriteAndOutboxEventRollbackAtomically(t *testing.T) {
 	database := eventsTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -47,6 +48,7 @@ func TestBusinessWriteAndOutboxEventRollbackAtomically(t *testing.T) {
 	}
 }
 
+// eventsTestDatabase opens the database specified by SEA_EVENTS_TEST_DATABASE_URL, applies bundled migrations, truncates test tables, and registers cleanup; it skips the test when the URL is unset and fails on setup errors.
 func eventsTestDatabase(t *testing.T) *sql.DB {
 	t.Helper()
 	databaseURL := os.Getenv("SEA_EVENTS_TEST_DATABASE_URL")

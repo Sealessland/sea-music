@@ -9,6 +9,7 @@ import (
 	"github.com/sealessland/sea-music/internal/social"
 )
 
+// TestCommentRepliesAreOneLevelAndDeletedParentBecomesTombstone verifies that a reply cannot itself be replied to (returning ErrInvalidCommentParent), and that deleting a parent which has a reply replaces it with a deleted, empty-body tombstone that still lists the existing reply.
 func TestCommentRepliesAreOneLevelAndDeletedParentBecomesTombstone(t *testing.T) {
 	database := socialTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -38,6 +39,7 @@ func TestCommentRepliesAreOneLevelAndDeletedParentBecomesTombstone(t *testing.T)
 	}
 }
 
+// TestCommentCursorIsStableAcrossNewInsertions verifies that cursor pagination remains stable when a new comment is inserted between page fetches: the cursor snapshot excludes the interloping comment, and the second page returns only the remaining original comments without duplication or skipping.
 func TestCommentCursorIsStableAcrossNewInsertions(t *testing.T) {
 	database := socialTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

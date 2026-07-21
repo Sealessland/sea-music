@@ -16,6 +16,7 @@ import (
 	"github.com/sealessland/sea-music/internal/video"
 )
 
+// runHotLoop continuously consumes engagement events into the hot-ranking projection, logging each processed event or failure until the context is canceled.
 func runHotLoop(ctx context.Context, consumer events.Consumer, projector *discovery.HotProjector, logger *slog.Logger) {
 	handler := func(ctx context.Context, transaction *sql.Tx, envelope events.Envelope) error {
 		return projector.Handle(ctx, transaction, discovery.EngagementEvent{ID: envelope.ID, Type: envelope.Type, OccurredAt: envelope.OccurredAt, Data: envelope.Data})
@@ -33,6 +34,7 @@ func runHotLoop(ctx context.Context, consumer events.Consumer, projector *discov
 	}
 }
 
+// runModerationConsumerLoop continuously consumes events, transactionally enqueuing moderation dispatches for valid video.ready_for_moderation payloads and logging failures until cancellation.
 func runModerationConsumerLoop(ctx context.Context, consumer events.Consumer, logger *slog.Logger) {
 	handler := func(ctx context.Context, transaction *sql.Tx, envelope events.Envelope) error {
 		if envelope.Type != "video.ready_for_moderation" {
@@ -60,6 +62,7 @@ func runModerationConsumerLoop(ctx context.Context, consumer events.Consumer, lo
 	}
 }
 
+// runModerationDispatchLoop advances one moderation dispatch per polling interval until cancellation, logging successes and failures while treating ErrNoOperation as an idle poll.
 func runModerationDispatchLoop(ctx context.Context, dispatcher *moderation.Dispatcher, pollInterval time.Duration, logger *slog.Logger) {
 	for {
 		job, err := dispatcher.RunOnce(ctx)
@@ -81,6 +84,7 @@ func runModerationDispatchLoop(ctx context.Context, dispatcher *moderation.Dispa
 	}
 }
 
+// runReconciliationLoop periodically reconciles a batch of persisted social counters until cancellation, logging errors and repaired drift.
 func runReconciliationLoop(ctx context.Context, reconciler *social.CounterReconciler, interval time.Duration, batch int, logger *slog.Logger) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -99,6 +103,7 @@ func runReconciliationLoop(ctx context.Context, reconciler *social.CounterReconc
 	}
 }
 
+// runQueuedActivationLoop periodically activates queued processing jobs older than the threshold until cancellation, logging failures and jobs recovered without a finalize event.
 func runQueuedActivationLoop(ctx context.Context, repository *video.PostgresRepository, interval, threshold time.Duration, logger *slog.Logger) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -117,6 +122,7 @@ func runQueuedActivationLoop(ctx context.Context, repository *video.PostgresRepo
 	}
 }
 
+// runCounterLoop continuously consumes events into the social-counter projection, logging each processed event or failure until the context is canceled.
 func runCounterLoop(ctx context.Context, consumer events.Consumer, projector *social.CounterProjector, logger *slog.Logger) {
 	handler := func(ctx context.Context, transaction *sql.Tx, envelope events.Envelope) error {
 		return projector.Handle(ctx, transaction, social.CounterEvent{ID: envelope.ID, Type: envelope.Type, Data: envelope.Data})
@@ -134,6 +140,7 @@ func runCounterLoop(ctx context.Context, consumer events.Consumer, projector *so
 	}
 }
 
+// runConsumerLoop continuously consumes events, transactionally activating processing jobs from valid video.source_finalized payloads and logging failures until cancellation.
 func runConsumerLoop(ctx context.Context, consumer events.Consumer, logger *slog.Logger) {
 	handler := func(ctx context.Context, transaction *sql.Tx, envelope events.Envelope) error {
 		if envelope.Type != "video.source_finalized" {
@@ -160,6 +167,7 @@ func runConsumerLoop(ctx context.Context, consumer events.Consumer, logger *slog
 	}
 }
 
+// runMediaLoop processes available media jobs continuously until cancellation, waiting for the polling interval only when no job is available and otherwise logging completion or failure.
 func runMediaLoop(ctx context.Context, service *video.ProcessingService, pollInterval time.Duration, logger *slog.Logger) {
 	for {
 		_, err := service.RunOnce(ctx)
@@ -182,6 +190,7 @@ func runMediaLoop(ctx context.Context, service *video.ProcessingService, pollInt
 	}
 }
 
+// runEventLoop dispatches an outbox batch each polling interval until cancellation, logging failures and nonempty batches.
 func runEventLoop(ctx context.Context, dispatcher *events.Dispatcher, pollInterval time.Duration, logger *slog.Logger) {
 	for {
 		count, err := dispatcher.RunOnce(ctx)

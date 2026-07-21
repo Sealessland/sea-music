@@ -8,6 +8,7 @@ import (
 	"github.com/sealessland/sea-music/internal/moderation"
 )
 
+// TestStartReviewIsIdempotentForTheSameRequest verifies that repeating an identical review request returns the same pending operation ID.
 func TestStartReviewIsIdempotentForTheSameRequest(t *testing.T) {
 	store := newMemoryStore()
 	service := moderation.NewService(store)
@@ -29,6 +30,7 @@ func TestStartReviewIsIdempotentForTheSameRequest(t *testing.T) {
 	}
 }
 
+// TestStartReviewRejectsRequestIDReuseWithDifferentInput verifies that reusing a request ID with changed input returns ErrIdempotencyConflict.
 func TestStartReviewRejectsRequestIDReuseWithDifferentInput(t *testing.T) {
 	service := moderation.NewService(newMemoryStore())
 	request := validRequest()
@@ -43,6 +45,7 @@ func TestStartReviewRejectsRequestIDReuseWithDifferentInput(t *testing.T) {
 	}
 }
 
+// TestCompleteShadowReviewPersistsEvidenceWithoutPublishingAuthority verifies that completing a shadow review stores its escalation evidence while leaving CanPublish false.
 func TestCompleteShadowReviewPersistsEvidenceWithoutPublishingAuthority(t *testing.T) {
 	store := newMemoryStore()
 	service := moderation.NewService(store)
@@ -74,6 +77,7 @@ func TestCompleteShadowReviewPersistsEvidenceWithoutPublishingAuthority(t *testi
 	}
 }
 
+// validRequest returns a reusable shadow-mode review request with fixed video, policy, metadata, and asset values for tests.
 func validRequest() moderation.ReviewRequest {
 	return moderation.ReviewRequest{
 		RequestID: "video-1-v4-ugc-v1", VideoID: "video-1", VideoVersion: 4,
@@ -89,10 +93,12 @@ type memoryStore struct {
 	next      int
 }
 
+// newMemoryStore returns an empty in-memory operation store with initialized ID and request indexes.
 func newMemoryStore() *memoryStore {
 	return &memoryStore{byID: map[string]moderation.Operation{}, byRequest: map[string]string{}}
 }
 
+// Create persists a pending operation for a new request ID, returns the existing operation for identical input, and returns ErrIdempotencyConflict when the ID is reused with different input.
 func (store *memoryStore) Create(_ context.Context, request moderation.ReviewRequest, inputHash string) (moderation.Operation, error) {
 	if id, ok := store.byRequest[request.RequestID]; ok {
 		operation := store.byID[id]
@@ -109,6 +115,7 @@ func (store *memoryStore) Create(_ context.Context, request moderation.ReviewReq
 	return operation, nil
 }
 
+// Get returns the operation with the given ID or ErrOperationNotFound if it is absent.
 func (store *memoryStore) Get(_ context.Context, operationID string) (moderation.Operation, error) {
 	operation, ok := store.byID[operationID]
 	if !ok {
@@ -117,6 +124,7 @@ func (store *memoryStore) Get(_ context.Context, operationID string) (moderation
 	return operation, nil
 }
 
+// Complete marks the identified operation completed, stores the supplied result, and returns ErrOperationNotFound if the operation is absent.
 func (store *memoryStore) Complete(_ context.Context, operationID string, result moderation.Result) (moderation.Operation, error) {
 	operation, ok := store.byID[operationID]
 	if !ok {

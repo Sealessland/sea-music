@@ -220,6 +220,14 @@ openspec/                 # spec-driven 开发过程材料
 
 依赖方向保持为 `cmd → appapi/platform → domain`：`cmd` 是组合根，负责进程生命周期和跨模块装配；`appapi` 只做传输层适配；业务规则与存储接口归属各领域包；`platform` 不反向依赖业务领域。领域包之间不得直接导入，该约束由 `internal/architecture/boundaries_test.go` 自动检查。包内优先按职责拆分文件，而不是增加只有一层实现的子包，避免 Java 式目录深度和无意义接口。
 
+### 代码行数火焰图
+
+<p align="center">
+  <img src="docs/assets/code-lines-flamegraph.svg" alt="Sea Music 按目录聚合的代码行数火焰图" width="100%">
+</p>
+
+> 统计口径：受 Git 跟踪的 Go、HTML、Shell、JavaScript、SQL、CSS、Proto 与 jq 源文件，共 22,972 行；矩形宽度与行数成正比。
+
 ## 配置
 
 本地开发零配置可运行（默认值指向 compose 依赖）；所有配置均为 `SEA_*` 环境变量，解析集中在 `internal/platform/config/`，可注入 `LookupEnv` 进行单测。常用项：

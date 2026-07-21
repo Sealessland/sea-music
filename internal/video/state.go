@@ -46,6 +46,7 @@ type Video struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
+// Transition returns a copy moved to target with its version incremented, or ErrVersionConflict for a stale expectedVersion and a wrapped ErrInvalidTransition when the state change is not allowed.
 func (video Video) Transition(expectedVersion int64, target State) (Video, error) {
 	if video.Version != expectedVersion {
 		return Video{}, ErrVersionConflict

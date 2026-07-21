@@ -28,11 +28,13 @@ type TokenManager struct {
 	accessTTL time.Duration
 }
 
+// NewTokenManager creates a token manager that owns a copy of key; Issue rejects keys shorter than 32 bytes, empty issuers, and nonpositive access lifetimes.
 func NewTokenManager(key []byte, issuer string, accessTTL time.Duration) *TokenManager {
 	keyCopy := append([]byte(nil), key...)
 	return &TokenManager{key: keyCopy, issuer: issuer, accessTTL: accessTTL}
 }
 
+// Issue creates an HS256 JWT for user and sessionID at now, returning its UTC-based expiration or an error if the manager configuration or JSON encoding is invalid.
 func (m *TokenManager) Issue(user User, sessionID string, now time.Time) (string, time.Time, error) {
 	if len(m.key) < 32 || m.issuer == "" || m.accessTTL <= 0 {
 		return "", time.Time{}, errors.New("invalid token manager configuration")
@@ -59,6 +61,7 @@ func (m *TokenManager) Issue(user User, sessionID string, now time.Time) (string
 	return unsigned + "." + base64.RawURLEncoding.EncodeToString(signature), expiresAt, nil
 }
 
+// Verify authenticates and decodes an HS256 JWT, returning ErrInvalidAccessToken for malformed or tampered tokens, issuer or required-claim mismatches, expired claims, or issue times more than 30 seconds in the future.
 func (m *TokenManager) Verify(token string, now time.Time) (AccessClaims, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
@@ -95,6 +98,7 @@ func (m *TokenManager) Verify(token string, now time.Time) (AccessClaims, error)
 	return claims, nil
 }
 
+// sign computes the HMAC-SHA256 authentication tag for value using the manager's private key copy.
 func (m *TokenManager) sign(value string) []byte {
 	mac := hmac.New(sha256.New, m.key)
 	_, _ = mac.Write([]byte(value))

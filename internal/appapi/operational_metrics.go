@@ -28,6 +28,7 @@ type OperationalMetrics struct {
 	redisTimeouts     *prometheus.Desc
 }
 
+// NewOperationalMetrics returns a Prometheus collector that exposes outbox, counter-reconciliation, SQL, processing-job, and Redis metrics gathered at scrape time from the supplied services.
 func NewOperationalMetrics(eventBacklog *events.PostgresRepository, counterReconciler *social.CounterReconciler, database *sql.DB, redisClient *redis.Client) *OperationalMetrics {
 	return &OperationalMetrics{
 		eventBacklog: eventBacklog, counterReconciler: counterReconciler, database: database, redis: redisClient,
@@ -44,12 +45,14 @@ func NewOperationalMetrics(eventBacklog *events.PostgresRepository, counterRecon
 	}
 }
 
+// Describe sends each metric descriptor exposed by this collector to the provided Prometheus channel.
 func (metrics *OperationalMetrics) Describe(descriptions chan<- *prometheus.Desc) {
 	for _, description := range []*prometheus.Desc{metrics.outboxEvents, metrics.outboxOldest, metrics.reconciliations, metrics.counterDrift, metrics.sqlConnections, metrics.processingJobs, metrics.redisConnections, metrics.redisHits, metrics.redisMisses, metrics.redisTimeouts} {
 		descriptions <- description
 	}
 }
 
+// Collect emits current operational metrics, using a shared two-second timeout for repository and processing-job queries and omitting metrics whose query or row scan fails.
 func (metrics *OperationalMetrics) Collect(output chan<- prometheus.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

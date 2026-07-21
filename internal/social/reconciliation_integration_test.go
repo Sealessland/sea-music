@@ -10,6 +10,7 @@ import (
 	"github.com/sealessland/sea-music/internal/social"
 )
 
+// TestReconciliationRepairsDeliberateDatabaseAndCacheDrift verifies that reconciliation restores database and Redis counters from authoritative social records and writes a single audit row.
 func TestReconciliationRepairsDeliberateDatabaseAndCacheDrift(t *testing.T) {
 	database := socialTestDatabase(t)
 	options, err := redis.ParseURL(os.Getenv("SEA_REDIS_TEST_URL"))

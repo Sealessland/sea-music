@@ -35,6 +35,7 @@ type KafkaConsumer struct {
 	repository *PostgresRepository
 }
 
+// NewKafkaConsumer validates config and dependencies, then creates a traced Kafka group consumer that reads the configured topic from the beginning when no committed offset exists.
 func NewKafkaConsumer(config ConsumerConfig, inbox *Inbox, repository *PostgresRepository) (*KafkaConsumer, error) {
 	if len(config.Brokers) == 0 || strings.TrimSpace(config.Topic) == "" || strings.TrimSpace(config.Group) == "" ||
 		strings.TrimSpace(config.Name) == "" || config.MaxAttempts <= 0 || config.BaseBackoff <= 0 || inbox == nil || repository == nil {
@@ -53,6 +54,7 @@ func NewKafkaConsumer(config ConsumerConfig, inbox *Inbox, repository *PostgresR
 	return &KafkaConsumer{config: config, client: client, inbox: inbox, repository: repository}, nil
 }
 
+// RunOnce polls at most one record, validates and processes it with bounded exponential-backoff retries, then commits it after success or transactional quarantine; it returns true only when a record is committed.
 func (consumer *KafkaConsumer) RunOnce(ctx context.Context, handler InboxHandler) (bool, error) {
 	records := consumer.client.PollRecords(ctx, 1)
 	if err := records.Err(); err != nil {
@@ -178,10 +180,12 @@ func (consumer *RocketMQConsumer) Close() {
 	_ = consumer.client.Close()
 }
 
+// Close synchronously shuts down the underlying Kafka client, leaving the consumer unusable.
 func (consumer *KafkaConsumer) Close() {
 	consumer.client.Close()
 }
 
+// Quarantine transactionally inserts a dead letter and enqueues a DLQ event, treating an existing dead letter for the same consumer and event as success and truncating the recorded cause to 2,000 bytes.
 func (repository *PostgresRepository) Quarantine(ctx context.Context, consumerName, originalTopic string, envelope Envelope, attempts int, cause error) error {
 	if err := envelope.Validate(); err != nil {
 		return err

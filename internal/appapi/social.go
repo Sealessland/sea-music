@@ -18,10 +18,12 @@ type SocialHandler struct {
 	logger     *slog.Logger
 }
 
+// NewSocialHandler constructs a handler that uses the given repository, authenticator, and logger for social API requests.
 func NewSocialHandler(repository *social.PostgresRepository, auth *Authenticator, logger *slog.Logger) *SocialHandler {
 	return &SocialHandler{repository: repository, auth: auth, logger: logger}
 }
 
+// RegisterRoutes mounts the social relation, comment, and danmaku endpoints, requiring authentication for every mutating route.
 func (handler *SocialHandler) RegisterRoutes(router gin.IRouter) {
 	router.PUT("/api/v1/videos/:video_id/like", handler.auth.Require(), handler.setLike(true))
 	router.DELETE("/api/v1/videos/:video_id/like", handler.auth.Require(), handler.setLike(false))
@@ -36,6 +38,7 @@ func (handler *SocialHandler) RegisterRoutes(router gin.IRouter) {
 	router.GET("/api/v1/videos/:video_id/danmaku", handler.listDanmaku)
 }
 
+// createComment validates an authenticated user's JSON payload, creates a comment on the requested video, and returns it with HTTP 201.
 func (handler *SocialHandler) createComment(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
@@ -55,6 +58,7 @@ func (handler *SocialHandler) createComment(context *gin.Context) {
 	httpx.WriteJSON(writer, http.StatusCreated, map[string]any{"comment": comment})
 }
 
+// listComments returns a cursor-paginated page of comments for the requested video, defaulting the limit to 20 when absent.
 func (handler *SocialHandler) listComments(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	limit := parseQueryInt(context, "limit", 20)
@@ -66,6 +70,7 @@ func (handler *SocialHandler) listComments(context *gin.Context) {
 	httpx.WriteJSON(writer, http.StatusOK, page)
 }
 
+// deleteComment deletes the requested comment as the authenticated user and returns HTTP 204, subject to repository authorization checks.
 func (handler *SocialHandler) deleteComment(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
@@ -77,6 +82,7 @@ func (handler *SocialHandler) deleteComment(context *gin.Context) {
 	writer.WriteHeader(http.StatusNoContent)
 }
 
+// createDanmaku validates an authenticated user's JSON payload, creates a timed message on the requested video, and returns it with HTTP 201.
 func (handler *SocialHandler) createDanmaku(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
@@ -96,6 +102,7 @@ func (handler *SocialHandler) createDanmaku(context *gin.Context) {
 	httpx.WriteJSON(writer, http.StatusCreated, map[string]any{"danmaku": message})
 }
 
+// listDanmaku returns a cursor-paginated page of danmaku in the requested time range, defaulting to a five-minute window and a limit of 100.
 func (handler *SocialHandler) listDanmaku(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	startMS := parseQueryInt(context, "start_ms", 0)
@@ -109,6 +116,7 @@ func (handler *SocialHandler) listDanmaku(context *gin.Context) {
 	httpx.WriteJSON(writer, http.StatusOK, page)
 }
 
+// parseQueryInt returns the fallback for an absent query parameter, the parsed integer when valid, or -1 when parsing fails.
 func parseQueryInt(context *gin.Context, key string, fallback int) int {
 	raw := context.Query(key)
 	if raw == "" {
@@ -121,6 +129,7 @@ func parseQueryInt(context *gin.Context, key string, fallback int) int {
 	return value
 }
 
+// writeSocialError maps known social errors to API responses and logs unexpected errors with the request ID before returning HTTP 500.
 func (handler *SocialHandler) writeSocialError(writer http.ResponseWriter, request *http.Request, err error) {
 	switch {
 	case errors.Is(err, social.ErrCommentNotFound):
@@ -138,6 +147,7 @@ func (handler *SocialHandler) writeSocialError(writer http.ResponseWriter, reque
 	}
 }
 
+// setLike returns an authenticated handler that enables or disables the current user's like on the requested video and writes the resulting relation state.
 func (handler *SocialHandler) setLike(enabled bool) gin.HandlerFunc {
 	return func(context *gin.Context) {
 		writer, request := context.Writer, context.Request
@@ -147,6 +157,7 @@ func (handler *SocialHandler) setLike(enabled bool) gin.HandlerFunc {
 	}
 }
 
+// setFavorite returns an authenticated handler that enables or disables the current user's favorite on the requested video and writes the resulting relation state.
 func (handler *SocialHandler) setFavorite(enabled bool) gin.HandlerFunc {
 	return func(context *gin.Context) {
 		writer, request := context.Writer, context.Request
@@ -156,6 +167,7 @@ func (handler *SocialHandler) setFavorite(enabled bool) gin.HandlerFunc {
 	}
 }
 
+// setFollow returns an authenticated handler that enables or disables the current user's follow of the requested user and writes the resulting relation state.
 func (handler *SocialHandler) setFollow(enabled bool) gin.HandlerFunc {
 	return func(context *gin.Context) {
 		writer, request := context.Writer, context.Request
@@ -165,6 +177,7 @@ func (handler *SocialHandler) setFollow(enabled bool) gin.HandlerFunc {
 	}
 }
 
+// writeResult writes a successful relation result with HTTP 200, or logs the failure with the request ID and returns an unprocessable-entity error.
 func (handler *SocialHandler) writeResult(writer http.ResponseWriter, request *http.Request, result social.RelationResult, err error) {
 	if err == nil {
 		httpx.WriteJSON(writer, http.StatusOK, result)

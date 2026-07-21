@@ -40,6 +40,7 @@ type report struct {
 	BacklogRecoveryMS int64     `json:"backlog_recovery_ms"`
 }
 
+// main runs the load test, reports startup or workflow errors to standard error, and exits with status 1 on failure.
 func main() {
 	if err := run(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "loadtest: %v\n", err)
@@ -47,6 +48,7 @@ func main() {
 	}
 }
 
+// run validates required environment settings, executes read and authenticated like-toggle load scenarios, waits for the outbox backlog to clear without failures, and writes an indented JSON report to standard output.
 func run() error {
 	baseURL := strings.TrimRight(os.Getenv("SEA_LOAD_BASE_URL"), "/")
 	token := os.Getenv("SEA_LOAD_ACCESS_TOKEN")
@@ -99,6 +101,7 @@ func run() error {
 	return encoder.Encode(output)
 }
 
+// executeScenario sends up to total requests across concurrency workers until completion or context cancellation, drains response bodies, and returns throughput, error-count, and latency statistics for the requests actually attempted.
 func executeScenario(ctx context.Context, name string, concurrency, total int, factory func(int) (*http.Request, error), client *http.Client) result {
 	started := time.Now()
 	jobs := make(chan int)
@@ -157,6 +160,7 @@ func executeScenario(ctx context.Context, name string, concurrency, total int, f
 	}
 }
 
+// percentile returns the selected zero-based duration quantile in milliseconds from an already sorted slice, or zero for an empty slice.
 func percentile(values []time.Duration, quantile float64) float64 {
 	if len(values) == 0 {
 		return 0
@@ -165,6 +169,7 @@ func percentile(values []time.Duration, quantile float64) float64 {
 	return float64(values[index].Microseconds()) / 1000
 }
 
+// readOutboxBacklog fetches the service metrics endpoint and returns combined pending and publishing outbox counts plus the failed count, propagating transport, read, and parse errors.
 func readOutboxBacklog(ctx context.Context, client *http.Client, baseURL string) (int64, int64, error) {
 	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/metrics", nil)
 	response, err := client.Do(request)
@@ -179,6 +184,7 @@ func readOutboxBacklog(ctx context.Context, client *http.Client, baseURL string)
 	return parseOutboxMetrics(data)
 }
 
+// parseOutboxMetrics extracts pending, publishing, and failed outbox gauges, returning the first two as a combined backlog and failing if any required metric is missing or malformed.
 func parseOutboxMetrics(data []byte) (int64, int64, error) {
 	values := make(map[string]int64, 3)
 	for _, line := range strings.Split(string(data), "\n") {
@@ -199,6 +205,7 @@ func parseOutboxMetrics(data []byte) (int64, int64, error) {
 	return values["pending"] + values["publishing"], values["failed"], nil
 }
 
+// envPositiveInt returns the positive integer stored in key, falling back when the variable is unset, invalid, zero, or negative.
 func envPositiveInt(key string, fallback int) int {
 	value, err := strconv.Atoi(os.Getenv(key))
 	if err != nil || value <= 0 {

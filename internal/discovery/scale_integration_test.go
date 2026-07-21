@@ -8,6 +8,7 @@ import (
 	"github.com/sealessland/sea-music/internal/discovery"
 )
 
+// TestFollowingFeedTraversesHighFollowCardinalityWithDeepCursor verifies that cursor pagination returns all 250 followed creators' videos exactly once and supplies a nonempty continuation cursor whenever more pages remain.
 func TestFollowingFeedTraversesHighFollowCardinalityWithDeepCursor(t *testing.T) {
 	database := discoveryTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

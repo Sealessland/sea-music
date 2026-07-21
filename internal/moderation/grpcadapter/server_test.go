@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// TestStartReviewIsIdempotentOverGRPC verifies that replaying an identical request returns the same nonempty operation ID and leaves the review pending.
 func TestStartReviewIsIdempotentOverGRPC(t *testing.T) {
 	client := newTestClient(t)
 	request := validProtoRequest()
@@ -38,6 +39,7 @@ func TestStartReviewIsIdempotentOverGRPC(t *testing.T) {
 	}
 }
 
+// TestStartReviewMapsDomainErrorsToStableStatusCodes verifies that conflicts, invalid requests, and missing operations map to AlreadyExists, InvalidArgument, and NotFound.
 func TestStartReviewMapsDomainErrorsToStableStatusCodes(t *testing.T) {
 	client := newTestClient(t)
 	request := validProtoRequest()
@@ -57,6 +59,7 @@ func TestStartReviewMapsDomainErrorsToStableStatusCodes(t *testing.T) {
 	}
 }
 
+// TestDomainClientRoundTripsReviewAndMapsErrors verifies domain-to-protobuf request conversion, pending-operation decoding, and translation of remote conflicts and missing operations to domain sentinel errors.
 func TestDomainClientRoundTripsReviewAndMapsErrors(t *testing.T) {
 	raw := newTestClient(t)
 	client := grpcadapter.NewClient(raw, time.Second)
@@ -79,6 +82,7 @@ func TestDomainClientRoundTripsReviewAndMapsErrors(t *testing.T) {
 	}
 }
 
+// TestDomainClientRejectsInvalidRemoteEvidence verifies that malformed completed-review evidence from the remote service is rejected with ErrInvalidResult.
 func TestDomainClientRejectsInvalidRemoteEvidence(t *testing.T) {
 	client := grpcadapter.NewClient(invalidEvidenceClient{}, time.Second)
 	if _, err := client.GetReview(context.Background(), "operation-1"); !errors.Is(err, moderation.ErrInvalidResult) {
@@ -86,6 +90,7 @@ func TestDomainClientRejectsInvalidRemoteEvidence(t *testing.T) {
 	}
 }
 
+// TestDomainClientPreservesAgentDecisionAuditTrail verifies that result strategy, staged votes, and failed policy checks survive protobuf-to-domain conversion.
 func TestDomainClientPreservesAgentDecisionAuditTrail(t *testing.T) {
 	client := grpcadapter.NewClient(auditedEvidenceClient{}, time.Second)
 	operation, err := client.GetReview(context.Background(), "operation-1")
@@ -104,10 +109,12 @@ type invalidEvidenceClient struct{}
 
 type auditedEvidenceClient struct{}
 
+// StartReview always returns an error because the audited-evidence stub supports only GetReview.
 func (auditedEvidenceClient) StartReview(context.Context, *moderationv1.StartReviewRequest, ...grpc.CallOption) (*moderationv1.StartReviewResponse, error) {
 	return nil, errors.New("not used")
 }
 
+// GetReview returns a completed escalation containing reviewer and critic votes plus a failed consensus check for audit-trail conversion tests.
 func (auditedEvidenceClient) GetReview(context.Context, *moderationv1.GetReviewRequest, ...grpc.CallOption) (*moderationv1.GetReviewResponse, error) {
 	return &moderationv1.GetReviewResponse{Operation: &moderationv1.ReviewOperation{
 		OperationId: "operation-1", RequestId: "request-1", Status: moderationv1.ReviewStatus_REVIEW_STATUS_COMPLETED,
@@ -124,10 +131,12 @@ func (auditedEvidenceClient) GetReview(context.Context, *moderationv1.GetReviewR
 	}}, nil
 }
 
+// StartReview always returns an error because the invalid-evidence stub supports only GetReview.
 func (invalidEvidenceClient) StartReview(context.Context, *moderationv1.StartReviewRequest, ...grpc.CallOption) (*moderationv1.StartReviewResponse, error) {
 	return nil, errors.New("not used")
 }
 
+// GetReview returns a completed approval with an out-of-range confidence value to exercise remote-result validation.
 func (invalidEvidenceClient) GetReview(context.Context, *moderationv1.GetReviewRequest, ...grpc.CallOption) (*moderationv1.GetReviewResponse, error) {
 	return &moderationv1.GetReviewResponse{Operation: &moderationv1.ReviewOperation{
 		OperationId: "operation-1", Status: moderationv1.ReviewStatus_REVIEW_STATUS_COMPLETED,
@@ -135,6 +144,7 @@ func (invalidEvidenceClient) GetReview(context.Context, *moderationv1.GetReviewR
 	}}, nil
 }
 
+// newTestClient starts an in-memory gRPC moderation server, registers cleanup for the server and connection, and returns a client connected through bufconn.
 func newTestClient(t *testing.T) moderationv1.ModerationServiceClient {
 	t.Helper()
 	listener := bufconn.Listen(1 << 20)
@@ -154,6 +164,7 @@ func newTestClient(t *testing.T) moderationv1.ModerationServiceClient {
 	return moderationv1.NewModerationServiceClient(connection)
 }
 
+// validProtoRequest returns a complete shadow-mode review request with stable identifiers and one cover asset.
 func validProtoRequest() *moderationv1.StartReviewRequest {
 	return &moderationv1.StartReviewRequest{
 		RequestId: "video-1-v4-ugc-v1", VideoId: "video-1", VideoVersion: 4,
@@ -163,6 +174,7 @@ func validProtoRequest() *moderationv1.StartReviewRequest {
 	}
 }
 
+// cloneRequest returns a deep protobuf clone that can be mutated without changing the original request.
 func cloneRequest(request *moderationv1.StartReviewRequest) *moderationv1.StartReviewRequest {
 	return proto.Clone(request).(*moderationv1.StartReviewRequest)
 }
@@ -172,10 +184,12 @@ type memoryStore struct {
 	byRequest map[string]string
 }
 
+// newMemoryStore returns an empty in-memory operation store indexed by operation and request IDs.
 func newMemoryStore() *memoryStore {
 	return &memoryStore{byID: map[string]moderation.Operation{}, byRequest: map[string]string{}}
 }
 
+// Create persists a pending operation, returns the existing operation for an identical request hash, and reports ErrIdempotencyConflict when the request ID is reused with different input.
 func (store *memoryStore) Create(_ context.Context, request moderation.ReviewRequest, inputHash string) (moderation.Operation, error) {
 	if id, ok := store.byRequest[request.RequestID]; ok {
 		operation := store.byID[id]
@@ -191,6 +205,7 @@ func (store *memoryStore) Create(_ context.Context, request moderation.ReviewReq
 	return operation, nil
 }
 
+// Get returns the stored operation or ErrOperationNotFound when its ID is absent.
 func (store *memoryStore) Get(_ context.Context, operationID string) (moderation.Operation, error) {
 	operation, ok := store.byID[operationID]
 	if !ok {
@@ -199,6 +214,7 @@ func (store *memoryStore) Get(_ context.Context, operationID string) (moderation
 	return operation, nil
 }
 
+// Complete always returns an error because completion is outside this gRPC contract test store's scope.
 func (store *memoryStore) Complete(context.Context, string, moderation.Result) (moderation.Operation, error) {
 	return moderation.Operation{}, errors.New("not implemented in gRPC contract test")
 }

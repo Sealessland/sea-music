@@ -8,6 +8,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/httpserver"
 )
 
+// TestReadinessFailsRequiredDependencyButNotOptionalDependency verifies that optional failures remain observable through OptionalStatus without failing readiness, while required failures make Check return an error.
 func TestReadinessFailsRequiredDependencyButNotOptionalDependency(t *testing.T) {
 	optionalFailure := errors.New("optional broker unavailable")
 	dependencies := httpserver.Dependencies{

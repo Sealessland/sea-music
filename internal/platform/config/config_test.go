@@ -8,6 +8,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/config"
 )
 
+// TestLoadUsesSafeOperationalDefaults verifies that minimal valid input yields the expected development, network, database, authentication, rate-limit, and moderation defaults.
 func TestLoadUsesSafeOperationalDefaults(t *testing.T) {
 	values := map[string]string{
 		"SEA_AUTH_TOKEN_KEY": strings.Repeat("k", 32),
@@ -53,6 +54,7 @@ func TestLoadUsesSafeOperationalDefaults(t *testing.T) {
 	}
 }
 
+// TestLoadRejectsUnsafeModerationConfiguration verifies that unsupported or unsafe moderation settings fail with an error naming the offending environment variable.
 func TestLoadRejectsUnsafeModerationConfiguration(t *testing.T) {
 	base := map[string]string{"SEA_AUTH_TOKEN_KEY": strings.Repeat("k", 32)}
 	tests := []struct {
@@ -78,6 +80,7 @@ func TestLoadRejectsUnsafeModerationConfiguration(t *testing.T) {
 	}
 }
 
+// TestLoadRequiresModerationProviderSecret verifies that selecting the OpenAI moderation provider without its API key fails with an error naming the required variable.
 func TestLoadRequiresModerationProviderSecret(t *testing.T) {
 	_, err := config.LoadFrom(mapLookup(map[string]string{
 		"SEA_AUTH_TOKEN_KEY": strings.Repeat("k", 32), "SEA_MODERATION_PROVIDER": "openai",
@@ -87,6 +90,7 @@ func TestLoadRequiresModerationProviderSecret(t *testing.T) {
 	}
 }
 
+// TestLoadValidatesModerationDecisionThresholds verifies that thresholds outside the valid range or ordered below the approval threshold fail with an error naming the offending variable.
 func TestLoadValidatesModerationDecisionThresholds(t *testing.T) {
 	base := map[string]string{"SEA_AUTH_TOKEN_KEY": strings.Repeat("k", 32)}
 	tests := []struct {
@@ -110,6 +114,7 @@ func TestLoadValidatesModerationDecisionThresholds(t *testing.T) {
 	}
 }
 
+// TestLoadRejectsWeakTokenKeyWithoutEchoingIt verifies that an undersized authentication token key is rejected without exposing the secret in the error.
 func TestLoadRejectsWeakTokenKeyWithoutEchoingIt(t *testing.T) {
 	const weakKey = "do-not-log-me"
 	_, err := config.LoadFrom(mapLookup(map[string]string{
@@ -123,6 +128,7 @@ func TestLoadRejectsWeakTokenKeyWithoutEchoingIt(t *testing.T) {
 	}
 }
 
+// TestLoadRejectsInvalidDuration verifies that an unparseable shutdown timeout fails with an error naming its environment variable.
 func TestLoadRejectsInvalidDuration(t *testing.T) {
 	_, err := config.LoadFrom(mapLookup(map[string]string{
 		"SEA_AUTH_TOKEN_KEY":        strings.Repeat("k", 32),
@@ -133,6 +139,7 @@ func TestLoadRejectsInvalidDuration(t *testing.T) {
 	}
 }
 
+// TestProductionRejectsLocalDatabaseDefault verifies that production configuration cannot retain the default local database URL and reports the required database variable.
 func TestProductionRejectsLocalDatabaseDefault(t *testing.T) {
 	_, err := config.LoadFrom(mapLookup(map[string]string{
 		"SEA_ENV":                  "production",
@@ -144,6 +151,7 @@ func TestProductionRejectsLocalDatabaseDefault(t *testing.T) {
 	}
 }
 
+// TestConfigurationRejectsWildcardCORS verifies that a wildcard allowed origin is rejected with an error naming the CORS environment variable.
 func TestConfigurationRejectsWildcardCORS(t *testing.T) {
 	_, err := config.LoadFrom(mapLookup(map[string]string{
 		"SEA_AUTH_TOKEN_KEY":       strings.Repeat("k", 32),
@@ -154,6 +162,7 @@ func TestConfigurationRejectsWildcardCORS(t *testing.T) {
 	}
 }
 
+// TestLoadParsesDownloadURLCacheSwitch verifies that the download-cache switch accepts a valid boolean and rejects invalid text with an error naming the environment variable.
 func TestLoadParsesDownloadURLCacheSwitch(t *testing.T) {
 	cfg, err := config.LoadFrom(mapLookup(map[string]string{
 		"SEA_AUTH_TOKEN_KEY":            strings.Repeat("k", 32),
@@ -202,6 +211,7 @@ func TestLoadRejectsUnknownEventBroker(t *testing.T) {
 	}
 }
 
+// mapLookup returns an environment lookup function backed by values, preserving each key's value and presence status.
 func mapLookup(values map[string]string) config.LookupEnv {
 	return func(key string) (string, bool) {
 		value, ok := values[key]

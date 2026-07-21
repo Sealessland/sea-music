@@ -46,6 +46,7 @@ type commentCursor struct {
 	ID        string    `json:"id"`
 }
 
+// CreateComment validates and persists a trimmed comment on a published video, optionally as a direct reply to an existing undeleted top-level comment, and atomically enqueues a creation event when an outbox is available.
 func (repository *PostgresRepository) CreateComment(ctx context.Context, authorID, videoID, parentID, body string) (Comment, error) {
 	body = strings.TrimSpace(body)
 	if authorID == "" || videoID == "" || body == "" || len([]rune(body)) > 1000 {
@@ -105,6 +106,7 @@ func (repository *PostgresRepository) CreateComment(ctx context.Context, authorI
 	return comment, nil
 }
 
+// DeleteComment atomically soft-deletes a comment for its author, the video's creator, a moderator, or an admin, and enqueues a deletion event when available; repeated deletion is a no-op.
 func (repository *PostgresRepository) DeleteComment(ctx context.Context, commentID string, actor Actor) error {
 	transaction, err := repository.database.BeginTx(ctx, nil)
 	if err != nil {
@@ -149,6 +151,7 @@ func (repository *PostgresRepository) DeleteComment(ctx context.Context, comment
 	return nil
 }
 
+// ListComments returns up to limit top-level comments for a video in reverse chronological order, including at most 100 oldest-first replies per comment and a cursor when more results exist.
 func (repository *PostgresRepository) ListComments(ctx context.Context, videoID, cursor string, limit int) (CommentPage, error) {
 	if videoID == "" || limit <= 0 || limit > 100 {
 		return CommentPage{}, ErrInvalidComment
@@ -206,6 +209,7 @@ func (repository *PostgresRepository) ListComments(ctx context.Context, videoID,
 	return page, nil
 }
 
+// listReplies returns at most 100 replies to a parent comment in chronological order, marking soft-deleted replies and setting their ParentID.
 func (repository *PostgresRepository) listReplies(ctx context.Context, parentID string) ([]Comment, error) {
 	rows, err := repository.database.QueryContext(ctx, `
 		SELECT id::text, video_id::text, author_id::text, body, deleted_at, created_at
@@ -229,11 +233,13 @@ func (repository *PostgresRepository) listReplies(ctx context.Context, parentID 
 	return replies, rows.Err()
 }
 
+// encodeCommentCursor serializes a comment's creation time and ID as unpadded URL-safe base64 JSON for keyset pagination.
 func encodeCommentCursor(cursor commentCursor) string {
 	encoded, _ := json.Marshal(cursor)
 	return base64.RawURLEncoding.EncodeToString(encoded)
 }
 
+// decodeCommentCursor parses an unpadded URL-safe base64 JSON cursor and returns ErrInvalidCursor unless both its creation time and ID are present.
 func decodeCommentCursor(value string) (commentCursor, error) {
 	decoded, err := base64.RawURLEncoding.DecodeString(value)
 	if err != nil {

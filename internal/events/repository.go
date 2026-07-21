@@ -26,10 +26,12 @@ type PostgresRepository struct {
 	database *sql.DB
 }
 
+// NewPostgresRepository returns a repository that uses database for PostgreSQL-backed event storage.
 func NewPostgresRepository(database *sql.DB) *PostgresRepository {
 	return &PostgresRepository{database: database}
 }
 
+// EnqueueTx validates event, inserts it into the outbox within transaction, and returns its database-assigned envelope; it rejects a nil transaction or blank topic and wraps insert failures.
 func (repository *PostgresRepository) EnqueueTx(ctx context.Context, transaction *sql.Tx, event NewEvent) (Envelope, error) {
 	if transaction == nil || strings.TrimSpace(event.Topic) == "" {
 		return Envelope{}, errors.New("transaction and event topic are required")

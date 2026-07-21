@@ -13,6 +13,7 @@ type operationRunner interface {
 	RunOnce(context.Context) (moderation.Operation, error)
 }
 
+// runModerationLoop repeatedly processes moderation operations at the polling interval, logging successes and non-empty-queue failures until the context is canceled.
 func runModerationLoop(ctx context.Context, runner operationRunner, pollInterval time.Duration, logger *slog.Logger) {
 	for {
 		operation, err := runner.RunOnce(ctx)

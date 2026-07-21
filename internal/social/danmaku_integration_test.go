@@ -10,6 +10,7 @@ import (
 	"github.com/sealessland/sea-music/internal/social"
 )
 
+// TestDanmakuIsSanitizedRateLimitedAndWindowPaginated verifies that danmaku creation sanitizes script content, rejects a sixth rapid post with ErrDanmakuRateLimited, and cursor-paginates messages within the requested time window in position order.
 func TestDanmakuIsSanitizedRateLimitedAndWindowPaginated(t *testing.T) {
 	database := socialTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

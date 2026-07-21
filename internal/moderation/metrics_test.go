@@ -10,6 +10,7 @@ import (
 	"github.com/sealessland/sea-music/internal/moderation"
 )
 
+// TestInstrumentedEvaluatorExportsVerdictAndFailedPolicyChecks verifies that the instrumented evaluator exports an 'escalate' verdict counter and increments both confidence_threshold and verdict_consensus policy failure counters when the underlying agent's reviewer and critic disagree.
 func TestInstrumentedEvaluatorExportsVerdictAndFailedPolicyChecks(t *testing.T) {
 	registry := prometheus.NewRegistry()
 	metrics := moderation.NewAgentMetrics(registry)

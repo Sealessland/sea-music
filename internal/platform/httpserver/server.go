@@ -10,6 +10,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/config"
 )
 
+// New constructs an HTTP server using the configured address and timeouts, with handler serving all requests.
 func New(cfg config.HTTP, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:              cfg.Address,

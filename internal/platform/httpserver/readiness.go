@@ -10,6 +10,7 @@ import (
 
 type CheckFunc func(context.Context) error
 
+// Check invokes the wrapped function with ctx and returns its error unchanged.
 func (function CheckFunc) Check(ctx context.Context) error {
 	return function(ctx)
 }
@@ -20,6 +21,7 @@ type Dependencies struct {
 	Timeout  time.Duration
 }
 
+// Check runs all required readiness checks in sorted name order, optionally under a shared timeout, and joins failures annotated with their dependency names.
 func (dependencies Dependencies) Check(ctx context.Context) error {
 	if dependencies.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -40,6 +42,7 @@ func (dependencies Dependencies) Check(ctx context.Context) error {
 	return result
 }
 
+// OptionalStatus runs every optional readiness check with ctx and returns each result keyed by dependency name without applying the configured timeout.
 func (dependencies Dependencies) OptionalStatus(ctx context.Context) map[string]error {
 	result := make(map[string]error, len(dependencies.Optional))
 	for name, checker := range dependencies.Optional {

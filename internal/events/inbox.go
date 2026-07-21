@@ -14,10 +14,12 @@ type Inbox struct {
 	database *sql.DB
 }
 
+// NewInbox returns an inbox that persists event claims in database.
 func NewInbox(database *sql.DB) *Inbox {
 	return &Inbox{database: database}
 }
 
+// Process atomically claims an event for consumerName and invokes handler in the same transaction, returning true only when the claim and handler work are committed; duplicate claims return (false, nil).
 func (inbox *Inbox) Process(ctx context.Context, consumerName string, envelope Envelope, handler InboxHandler) (bool, error) {
 	consumerName = strings.TrimSpace(consumerName)
 	if consumerName == "" || handler == nil {

@@ -22,6 +22,10 @@ type Envelope struct {
 	Data             json.RawMessage `json:"data"`
 }
 
+// Validate returns nil if the envelope has non-blank event and aggregate identifiers,
+// a positive event version, a non-negative aggregate version, a non-zero occurrence
+// time, an optional valid W3C traceparent, and non-empty valid JSON data. Otherwise it
+// returns an error describing the first failing check.
 func (envelope Envelope) Validate() error {
 	if strings.TrimSpace(envelope.ID) == "" || strings.TrimSpace(envelope.Type) == "" {
 		return errors.New("event id and type are required")

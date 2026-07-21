@@ -26,10 +26,12 @@ type HotProjector struct {
 	window   time.Duration
 }
 
+// NewHotProjector creates a projector that persists engagement scores and optionally mirrors them to the supplied Redis client using the given decay window.
 func NewHotProjector(database *sql.DB, client redis.UniversalClient, window time.Duration) *HotProjector {
 	return &HotProjector{database: database, redis: client, window: window}
 }
 
+// Handle validates and decodes an engagement event, idempotently applies its time-decayed weight within the transaction, and best-effort updates Redis; unsupported, incomplete (empty video ID or zero weight), expired, and duplicate events are silently skipped, while invalid or undecodable events return an error.
 func (projector *HotProjector) Handle(ctx context.Context, transaction *sql.Tx, event EngagementEvent) error {
 	if transaction == nil || event.ID == "" || event.OccurredAt.IsZero() {
 		return errors.New("invalid engagement event")
@@ -86,6 +88,7 @@ func (projector *HotProjector) Handle(ctx context.Context, transaction *sql.Tx, 
 	return nil
 }
 
+// engagementWeight returns the score delta for a supported engagement event, using exists to reverse like and favorite changes, and returns zero for unsupported types.
 func engagementWeight(eventType string, exists bool) float64 {
 	sign := 1.0
 	if !exists {
@@ -107,14 +110,17 @@ func engagementWeight(eventType string, exists bool) float64 {
 	}
 }
 
+// Hot returns an anonymous hot feed of the requested size.
 func (repository *PostgresRepository) Hot(ctx context.Context, limit int) (FeedPage, error) {
 	return repository.hotFor(ctx, "", limit)
 }
 
+// HotFor returns a hot feed for a viewer, excluding published videos whose creators have a block relationship with that viewer.
 func (repository *PostgresRepository) HotFor(ctx context.Context, viewerID string, limit int) (FeedPage, error) {
 	return repository.hotFor(ctx, viewerID, limit)
 }
 
+// hotFor builds a size-limited hot feed from Redis when available, falls back to PostgreSQL snapshots on Redis failure or absence, and fills ranking gaps with recent visible videos; the snapshot fallback marks the page degraded.
 func (repository *PostgresRepository) hotFor(ctx context.Context, viewerID string, limit int) (FeedPage, error) {
 	if limit <= 0 || limit > 100 {
 		return FeedPage{}, ErrInvalidFeedRequest
@@ -154,6 +160,7 @@ func (repository *PostgresRepository) hotFor(ctx context.Context, viewerID strin
 	return FeedPage{Items: items, Degraded: true}, err
 }
 
+// topUpRecent appends distinct recently published videos visible to the viewer until the requested limit is reached, marking appended items with the recent_fallback reason.
 func (repository *PostgresRepository) topUpRecent(ctx context.Context, viewerID string, items []FeedItem, limit int) ([]FeedItem, error) {
 	if len(items) >= limit {
 		return items, nil
@@ -198,6 +205,7 @@ func (repository *PostgresRepository) topUpRecent(ctx context.Context, viewerID 
 	return items, nil
 }
 
+// rankedIDs extracts candidate IDs in rank order from string and byte-slice Redis members, skipping members of other types.
 func rankedIDs(candidates []redis.Z) []string {
 	ids := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
@@ -211,6 +219,7 @@ func rankedIDs(candidates []redis.Z) []string {
 	return ids
 }
 
+// visibleCandidates filters ranked IDs to published videos visible to the viewer, preserves the supplied ranking order, assigns the reason code, and returns at most limit items.
 func (repository *PostgresRepository) visibleCandidates(ctx context.Context, viewerID string, ids []string, limit int, reason string) ([]FeedItem, error) {
 	items := make([]FeedItem, 0, min(limit, len(ids)))
 	if len(ids) == 0 {

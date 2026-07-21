@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// TestOpenAPIBaselineIsStructurallyValid verifies that the baseline OpenAPI document parses as version 3.1.x, defines responsive health endpoints and required schemas, and contains only resolvable local references.
 func TestOpenAPIBaselineIsStructurallyValid(t *testing.T) {
 	path := filepath.Join(repositoryRoot(t), "api", "openapi.json")
 	data, err := os.ReadFile(path)
@@ -42,6 +43,7 @@ func TestOpenAPIBaselineIsStructurallyValid(t *testing.T) {
 	assertReferencesResolve(t, document, document)
 }
 
+// assertReferencesResolve recursively traverses the given value, reporting as test errors any $ref that is not a local string pointer of the form "#/…" or cannot be resolved within document.
 func assertReferencesResolve(t *testing.T, value any, document map[string]any) {
 	t.Helper()
 	switch typed := value.(type) {
@@ -67,6 +69,7 @@ func assertReferencesResolve(t *testing.T, value any, document map[string]any) {
 	}
 }
 
+// referenceExists reports whether a local JSON Pointer-style reference can be traversed through object keys in document.
 func referenceExists(document map[string]any, reference string) bool {
 	var current any = document
 	for _, segment := range strings.Split(strings.TrimPrefix(reference, "#/"), "/") {
@@ -82,6 +85,7 @@ func referenceExists(document map[string]any, reference string) bool {
 	return true
 }
 
+// object returns the object stored under key or terminates the test if the key is missing or its value is not an object.
 func object(t *testing.T, parent map[string]any, key string) map[string]any {
 	t.Helper()
 	value, ok := parent[key].(map[string]any)
@@ -91,6 +95,7 @@ func object(t *testing.T, parent map[string]any, key string) map[string]any {
 	return value
 }
 
+// repositoryRoot returns the absolute path three directories above the test working directory, terminating the test if it cannot resolve that path.
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))

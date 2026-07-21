@@ -17,15 +17,18 @@ type EventsAdminHandler struct {
 	logger *slog.Logger
 }
 
+// NewEventsAdminHandler constructs an admin event replay handler that uses the supplied replay service, authenticator, and logger.
 func NewEventsAdminHandler(replay *events.ReplayService, auth *Authenticator, logger *slog.Logger) *EventsAdminHandler {
 	return &EventsAdminHandler{replay: replay, auth: auth, logger: logger}
 }
 
+// RegisterRoutes adds authenticated admin endpoints for replaying quarantined dead letters and failed outbox events.
 func (handler *EventsAdminHandler) RegisterRoutes(router gin.IRouter) {
 	router.POST("/api/v1/admin/dead-letters/:dead_letter_id/replay", handler.auth.Require(), handler.replayDeadLetter)
 	router.POST("/api/v1/admin/outbox-events/:event_id/replay", handler.auth.Require(), handler.replayOutboxEvent)
 }
 
+// replayDeadLetter attempts to replay the identified quarantined dead letter using the caller's role, returning status-specific errors and logging unexpected failures.
 func (handler *EventsAdminHandler) replayDeadLetter(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())
@@ -43,6 +46,7 @@ func (handler *EventsAdminHandler) replayDeadLetter(context *gin.Context) {
 	}
 }
 
+// replayOutboxEvent attempts to replay the identified failed outbox event using the caller's role, returning status-specific errors and logging unexpected failures.
 func (handler *EventsAdminHandler) replayOutboxEvent(context *gin.Context) {
 	writer, request := context.Writer, context.Request
 	principal, _ := identity.PrincipalFromContext(request.Context())

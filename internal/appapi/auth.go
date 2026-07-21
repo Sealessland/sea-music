@@ -14,18 +14,22 @@ type Authenticator struct {
 	tokens *identity.TokenManager
 }
 
+// NewAuthenticator creates an Authenticator that uses tokens to verify bearer access tokens.
 func NewAuthenticator(tokens *identity.TokenManager) *Authenticator {
 	return &Authenticator{tokens: tokens}
 }
 
+// Require returns Gin middleware that rejects missing, malformed, or unverifiable bearer tokens with HTTP 401 and otherwise adds the verified principal to the request context.
 func (auth *Authenticator) Require() gin.HandlerFunc {
 	return auth.ginAuthenticate(true)
 }
 
+// Optional returns Gin middleware that permits requests without an Authorization header, but rejects malformed or unverifiable bearer tokens with HTTP 401 and adds the principal from a valid token to the request context.
 func (auth *Authenticator) Optional() gin.HandlerFunc {
 	return auth.ginAuthenticate(false)
 }
 
+// ginAuthenticate returns Gin middleware that verifies bearer tokens, adds valid principals to request contexts, and aborts invalid requests with HTTP 401; when required is false, a missing Authorization header is allowed.
 func (auth *Authenticator) ginAuthenticate(required bool) gin.HandlerFunc {
 	return func(context *gin.Context) {
 		authorization := context.GetHeader("Authorization")

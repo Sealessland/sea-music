@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
+// TestMetricsUsePrometheusCounters verifies that recording allowed and rejected requests increments the corresponding Prometheus counters independently for the supplied operation label.
 func TestMetricsUsePrometheusCounters(t *testing.T) {
 	registry := prometheus.NewRegistry()
 	metrics := NewMetrics(registry)

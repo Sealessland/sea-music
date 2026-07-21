@@ -7,6 +7,7 @@ import (
 	"github.com/sealessland/sea-music/internal/video"
 )
 
+// TestPublicationStateMachineAllowsOnlyDeclaredTransitions verifies that a draft advances to uploaded with an incremented version, undeclared transitions return ErrInvalidTransition, and a stale expected version returns ErrVersionConflict.
 func TestPublicationStateMachineAllowsOnlyDeclaredTransitions(t *testing.T) {
 	draft := video.Video{ID: "video", State: video.StateDraft, Version: 0}
 	uploaded, err := draft.Transition(0, video.StateUploaded)
@@ -21,6 +22,7 @@ func TestPublicationStateMachineAllowsOnlyDeclaredTransitions(t *testing.T) {
 	}
 }
 
+// TestPublishedVideoCanOnlyBeWithdrawn verifies that a published video rejects a transition to processing with ErrInvalidTransition but permits withdrawal to StateWithdrawn.
 func TestPublishedVideoCanOnlyBeWithdrawn(t *testing.T) {
 	published := video.Video{ID: "video", State: video.StatePublished, Version: 5}
 	if _, err := published.Transition(5, video.StateProcessing); !errors.Is(err, video.ErrInvalidTransition) {

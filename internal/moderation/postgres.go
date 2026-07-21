@@ -14,6 +14,7 @@ type PostgresStore struct {
 	database *sql.DB
 }
 
+// Claim atomically leases the next eligible pending or expired-lease operation to workerID, increments its attempt count, and returns ErrNoOperation when none is available.
 func (store *PostgresStore) Claim(ctx context.Context, workerID string, leaseDuration time.Duration) (Operation, error) {
 	if store == nil || store.database == nil || strings.TrimSpace(workerID) == "" || leaseDuration <= 0 {
 		return Operation{}, errors.New("invalid moderation operation claim")
@@ -43,6 +44,7 @@ func (store *PostgresStore) Claim(ctx context.Context, workerID string, leaseDur
 	return operation, err
 }
 
+// Fail releases a valid unexpired running lease held by workerID, records the truncated cause, and either schedules the operation after backoff or marks it failed when the attempt limit is reached; it returns ErrLeaseLost if the lease is no longer valid.
 func (store *PostgresStore) Fail(ctx context.Context, operationID, workerID string, cause error, backoff time.Duration) error {
 	if store == nil || store.database == nil || strings.TrimSpace(operationID) == "" || strings.TrimSpace(workerID) == "" || cause == nil || backoff < 0 {
 		return errors.New("invalid moderation operation failure")
@@ -71,10 +73,12 @@ func (store *PostgresStore) Fail(ctx context.Context, operationID, workerID stri
 	return nil
 }
 
+// NewPostgresStore returns a store backed by database.
 func NewPostgresStore(database *sql.DB) *PostgresStore {
 	return &PostgresStore{database: database}
 }
 
+// Create persists a pending review operation and enforces request-ID idempotency, returning the existing operation for a matching input hash or ErrIdempotencyConflict for a different hash.
 func (store *PostgresStore) Create(ctx context.Context, request ReviewRequest, inputHash string) (Operation, error) {
 	if store == nil || store.database == nil {
 		return Operation{}, errors.New("moderation database is required")
@@ -106,6 +110,7 @@ func (store *PostgresStore) Create(ctx context.Context, request ReviewRequest, i
 	return store.Get(ctx, operationID)
 }
 
+// Get loads the operation identified by operationID, returning ErrOperationNotFound when it does not exist.
 func (store *PostgresStore) Get(ctx context.Context, operationID string) (Operation, error) {
 	if store == nil || store.database == nil {
 		return Operation{}, errors.New("moderation database is required")
@@ -117,6 +122,7 @@ func (store *PostgresStore) Get(ctx context.Context, operationID string) (Operat
 	`, operationID))
 }
 
+// Complete stores the result and clears any lease for a pending or running operation; repeated completion returns the existing completed operation, while other terminal states produce ErrInvalidResult.
 func (store *PostgresStore) Complete(ctx context.Context, operationID string, result Result) (Operation, error) {
 	if store == nil || store.database == nil {
 		return Operation{}, errors.New("moderation database is required")
@@ -148,6 +154,7 @@ func (store *PostgresStore) Complete(ctx context.Context, operationID string, re
 	return Operation{}, fmt.Errorf("%w: operation status %s", ErrInvalidResult, existing.Status)
 }
 
+// CompleteClaimed stores the result and clears the lease only when workerID still holds an unexpired lease on the running operation, otherwise returning ErrLeaseLost.
 func (store *PostgresStore) CompleteClaimed(ctx context.Context, operationID, workerID string, result Result) (Operation, error) {
 	if store == nil || store.database == nil || strings.TrimSpace(operationID) == "" || strings.TrimSpace(workerID) == "" {
 		return Operation{}, errors.New("invalid moderation operation completion")
@@ -169,6 +176,7 @@ func (store *PostgresStore) CompleteClaimed(ctx context.Context, operationID, wo
 	return operation, err
 }
 
+// getByRequestID loads the operation with requestID, returning ErrOperationNotFound when no matching row exists.
 func (store *PostgresStore) getByRequestID(ctx context.Context, requestID string) (Operation, error) {
 	return scanOperation(store.database.QueryRowContext(ctx, `
 		SELECT id::text, input_hash, request, status, result, error
@@ -181,6 +189,7 @@ type rowScanner interface {
 	Scan(...any) error
 }
 
+// scanOperation decodes a database row into an Operation, translating sql.ErrNoRows to ErrOperationNotFound and wrapping scan or JSON decoding failures.
 func scanOperation(row rowScanner) (Operation, error) {
 	var operation Operation
 	var encodedRequest []byte

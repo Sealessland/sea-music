@@ -15,10 +15,12 @@ type Server struct {
 	service *moderation.Service
 }
 
+// NewServer creates a gRPC moderation server backed by service.
 func NewServer(service *moderation.Service) *Server {
 	return &Server{service: service}
 }
 
+// StartReview validates and converts the request, starts a moderation review, and returns its initial operation state with domain failures mapped to gRPC status errors.
 func (server *Server) StartReview(ctx context.Context, request *moderationv1.StartReviewRequest) (*moderationv1.StartReviewResponse, error) {
 	if request == nil || server == nil || server.service == nil {
 		return nil, status.Error(codes.InvalidArgument, "moderation request is required")
@@ -41,6 +43,7 @@ func (server *Server) StartReview(ctx context.Context, request *moderationv1.Sta
 	return &moderationv1.StartReviewResponse{Operation: toProtoOperation(operation)}, nil
 }
 
+// GetReview retrieves an operation by ID and returns its protobuf representation, mapping domain failures to gRPC status errors.
 func (server *Server) GetReview(ctx context.Context, request *moderationv1.GetReviewRequest) (*moderationv1.GetReviewResponse, error) {
 	if request == nil || server == nil || server.service == nil {
 		return nil, status.Error(codes.InvalidArgument, "operation id is required")
@@ -52,6 +55,7 @@ func (server *Server) GetReview(ctx context.Context, request *moderationv1.GetRe
 	return &moderationv1.GetReviewResponse{Operation: toProtoOperation(operation)}, nil
 }
 
+// domainError maps known moderation errors to corresponding gRPC status codes and hides unrecognized failures behind a generic Internal error.
 func domainError(err error) error {
 	switch {
 	case errors.Is(err, moderation.ErrInvalidRequest), errors.Is(err, moderation.ErrInvalidResult):
@@ -65,6 +69,7 @@ func domainError(err error) error {
 	}
 }
 
+// fromProtoMode converts supported protobuf moderation modes to domain modes and returns the empty mode for unspecified or unknown values.
 func fromProtoMode(mode moderationv1.ModerationMode) moderation.Mode {
 	switch mode {
 	case moderationv1.ModerationMode_MODERATION_MODE_SHADOW:
@@ -76,6 +81,7 @@ func fromProtoMode(mode moderationv1.ModerationMode) moderation.Mode {
 	}
 }
 
+// toProtoOperation converts a domain operation and its optional nested result, findings, votes, and checks to protobuf messages.
 func toProtoOperation(operation moderation.Operation) *moderationv1.ReviewOperation {
 	result := &moderationv1.ReviewOperation{
 		OperationId: operation.ID,
@@ -113,12 +119,14 @@ func toProtoOperation(operation moderation.Operation) *moderationv1.ReviewOperat
 	return result
 }
 
+// toProtoFinding converts a domain policy finding to its protobuf representation.
 func toProtoFinding(finding moderation.Finding) *moderationv1.PolicyFinding {
 	return &moderationv1.PolicyFinding{
 		Code: finding.Code, Category: finding.Category, Score: finding.Score, TimestampMs: finding.TimestampMS,
 	}
 }
 
+// toProtoStatus converts a domain review status to its protobuf enum, falling back to REVIEW_STATUS_UNSPECIFIED for unknown values.
 func toProtoStatus(value moderation.Status) moderationv1.ReviewStatus {
 	switch value {
 	case moderation.StatusPending:
@@ -136,6 +144,7 @@ func toProtoStatus(value moderation.Status) moderationv1.ReviewStatus {
 	}
 }
 
+// toProtoVerdict converts a domain verdict to its protobuf enum, falling back to REVIEW_VERDICT_UNSPECIFIED for unknown values.
 func toProtoVerdict(value moderation.Verdict) moderationv1.ReviewVerdict {
 	switch value {
 	case moderation.VerdictApprove:

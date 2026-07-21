@@ -10,6 +10,7 @@ import (
 	"github.com/sealessland/sea-music/internal/social"
 )
 
+// TestLikeFavoriteAndCommentRequirePublishedVideo verifies that likes, favorites, and comments reject draft videos without persisting relations or events, while each succeeds for a published video and emits one outbox event.
 func TestLikeFavoriteAndCommentRequirePublishedVideo(t *testing.T) {
 	database := socialTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -49,6 +50,7 @@ func TestLikeFavoriteAndCommentRequirePublishedVideo(t *testing.T) {
 	}
 }
 
+// TestUnlikeAndUnfavoriteSucceedAfterVideoLeavesPublishedState verifies that existing likes and favorites can be removed after a published video is withdrawn, leaving no relations behind.
 func TestUnlikeAndUnfavoriteSucceedAfterVideoLeavesPublishedState(t *testing.T) {
 	database := socialTestDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -79,6 +81,7 @@ func TestUnlikeAndUnfavoriteSucceedAfterVideoLeavesPublishedState(t *testing.T) 
 	}
 }
 
+// insertVideoWithState inserts a video for the given creator in the requested state and returns its ID, failing the test if the database insert fails.
 func insertVideoWithState(t *testing.T, ctx context.Context, database *sql.DB, creatorID, state string) string {
 	t.Helper()
 	var videoID string

@@ -14,6 +14,7 @@ type PostgresRepository struct {
 	database *sql.DB
 }
 
+// FindUser returns the user with the given ID, or ErrIdentityNotFound if no such user exists.
 func (r *PostgresRepository) FindUser(ctx context.Context, userID string) (User, error) {
 	var user User
 	err := r.database.QueryRowContext(ctx, `
@@ -30,6 +31,7 @@ func (r *PostgresRepository) FindUser(ctx context.Context, userID string) (User,
 	return user, nil
 }
 
+// FindCredential returns credentials for the user whose username or email matches identity, or ErrIdentityNotFound if none exists.
 func (r *PostgresRepository) FindCredential(ctx context.Context, identity string) (Credential, error) {
 	var credential Credential
 	err := r.database.QueryRowContext(ctx, `
@@ -53,6 +55,7 @@ func (r *PostgresRepository) FindCredential(ctx context.Context, identity string
 	return credential, nil
 }
 
+// CreateSession starts a new refresh-session family for the user and returns the persisted session ID.
 func (r *PostgresRepository) CreateSession(ctx context.Context, userID string, tokenHash []byte, expiresAt time.Time) (string, error) {
 	var sessionID string
 	err := r.database.QueryRowContext(ctx, `
@@ -66,6 +69,7 @@ func (r *PostgresRepository) CreateSession(ctx context.Context, userID string, t
 	return sessionID, nil
 }
 
+// RotateSession atomically replaces a valid refresh session in its existing family and returns its user and the new session ID. Missing sessions return ErrInvalidRefresh; expired sessions revoke the entire family and return ErrInvalidRefresh; reuse of a rotated or revoked session revokes the entire family and returns ErrRefreshReplay.
 func (r *PostgresRepository) RotateSession(ctx context.Context, currentHash, nextHash []byte, expiresAt, now time.Time) (User, string, error) {
 	transaction, err := r.database.BeginTx(ctx, nil)
 	if err != nil {
@@ -138,10 +142,12 @@ func (r *PostgresRepository) RotateSession(ctx context.Context, currentHash, nex
 	return user, nextSessionID, nil
 }
 
+// NewPostgresRepository returns a repository that uses database for identity persistence.
 func NewPostgresRepository(database *sql.DB) *PostgresRepository {
 	return &PostgresRepository{database: database}
 }
 
+// Create inserts a user and returns the database-populated record, mapping unique-constraint violations to ErrIdentityConflict.
 func (r *PostgresRepository) Create(ctx context.Context, input CreateUser) (User, error) {
 	var user User
 	err := r.database.QueryRowContext(ctx, `

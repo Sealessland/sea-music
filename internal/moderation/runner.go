@@ -32,10 +32,12 @@ type Runner struct {
 	evaluationTimeout time.Duration
 }
 
+// NewRunner constructs a runner whose configuration is validated when RunOnce is called.
 func NewRunner(store ExecutionStore, evaluator Evaluator, workerID string, leaseDuration, evaluationTimeout time.Duration) *Runner {
 	return &Runner{store: store, evaluator: evaluator, workerID: workerID, leaseDuration: leaseDuration, evaluationTimeout: evaluationTimeout}
 }
 
+// RunOnce claims and evaluates one moderation operation under a timeout, forces the result's policy version, disables publishing (CanPublish = false), and completes the claim. Evaluation or validation failures are recorded with a one-second retry delay, with any recording error joined into the returned error.
 func (runner *Runner) RunOnce(ctx context.Context) (Operation, error) {
 	if runner == nil || runner.store == nil || runner.evaluator == nil || strings.TrimSpace(runner.workerID) == "" ||
 		runner.leaseDuration <= 0 || runner.evaluationTimeout <= 0 || runner.evaluationTimeout >= runner.leaseDuration {
@@ -73,10 +75,12 @@ func (runner *Runner) RunOnce(ctx context.Context) (Operation, error) {
 
 type ManualEscalationEvaluator struct{}
 
+// NewManualEscalationEvaluator returns a stateless evaluator for use when automatic moderation is unavailable.
 func NewManualEscalationEvaluator() ManualEscalationEvaluator {
 	return ManualEscalationEvaluator{}
 }
 
+// Evaluate ignores its inputs and returns a fixed, non-publishable manual-escalation result indicating that the automatic provider is disabled.
 func (ManualEscalationEvaluator) Evaluate(_ context.Context, _ ReviewRequest) (Result, error) {
 	return Result{
 		Verdict: VerdictEscalate, Confidence: 0,

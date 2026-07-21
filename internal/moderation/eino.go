@@ -27,6 +27,7 @@ type EinoCritic struct {
 	modelName string
 }
 
+// NewEinoEvaluator constructs an evaluator, rejecting a nil chat model or blank provider or model name.
 func NewEinoEvaluator(chatModel model.BaseChatModel, provider, modelName string) (*EinoEvaluator, error) {
 	if chatModel == nil || strings.TrimSpace(provider) == "" || strings.TrimSpace(modelName) == "" {
 		return nil, errors.New("invalid Eino moderation evaluator configuration")
@@ -34,6 +35,7 @@ func NewEinoEvaluator(chatModel model.BaseChatModel, provider, modelName string)
 	return &EinoEvaluator{chatModel: chatModel, provider: provider, modelName: modelName}, nil
 }
 
+// NewEinoCritic constructs an independent critic, rejecting a nil chat model or blank provider or model name.
 func NewEinoCritic(chatModel model.BaseChatModel, provider, modelName string) (*EinoCritic, error) {
 	if chatModel == nil || strings.TrimSpace(provider) == "" || strings.TrimSpace(modelName) == "" {
 		return nil, errors.New("invalid Eino moderation critic configuration")
@@ -41,6 +43,7 @@ func NewEinoCritic(chatModel model.BaseChatModel, provider, modelName string) (*
 	return &EinoCritic{chatModel: chatModel, provider: provider, modelName: modelName}, nil
 }
 
+// Evaluate validates and serializes the review request, submits it to the moderation model, and returns validated, non-publishing evidence attributed to the configured provider and model.
 func (evaluator *EinoEvaluator) Evaluate(ctx context.Context, request ReviewRequest) (Result, error) {
 	if evaluator == nil || evaluator.chatModel == nil {
 		return Result{}, errors.New("Eino moderation evaluator is required")
@@ -55,6 +58,7 @@ func (evaluator *EinoEvaluator) Evaluate(ctx context.Context, request ReviewRequ
 	return generateEvidence(ctx, evaluator.chatModel, moderationSystemPrompt, input, evaluator.provider, evaluator.modelName, request.PolicyVersion)
 }
 
+// Critique validates and serializes the request and candidate result, then asks the moderation model for an independent, validated, non-publishing verdict.
 func (critic *EinoCritic) Critique(ctx context.Context, request ReviewRequest, candidate Result) (Result, error) {
 	if critic == nil || critic.chatModel == nil {
 		return Result{}, errors.New("Eino moderation critic is required")
@@ -75,6 +79,7 @@ func (critic *EinoCritic) Critique(ctx context.Context, request ReviewRequest, c
 	return generateEvidence(ctx, critic.chatModel, moderationCriticPrompt, input, critic.provider, critic.modelName, request.PolicyVersion)
 }
 
+// generateEvidence sends the system prompt and JSON input to the chat model, decodes and validates its structured response, and returns evidence marked as non-publishable with the supplied provenance.
 func generateEvidence(ctx context.Context, chatModel model.BaseChatModel, systemPrompt string, input []byte, provider, modelName, policyVersion string) (Result, error) {
 	response, err := chatModel.Generate(ctx, []*schema.Message{
 		schema.SystemMessage(systemPrompt), schema.UserMessage(string(input)),

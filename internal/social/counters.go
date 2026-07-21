@@ -28,10 +28,12 @@ type CounterProjector struct {
 	redis redis.UniversalClient
 }
 
+// NewCounterProjector creates a projector that persists counter updates and optionally refreshes their Redis cache.
 func NewCounterProjector(client redis.UniversalClient) *CounterProjector {
 	return &CounterProjector{redis: client}
 }
 
+// Handle applies a supported social event to nonnegative video counters within the required transaction and best-effort refreshes Redis; unsupported event types are ignored.
 func (projector *CounterProjector) Handle(ctx context.Context, transaction *sql.Tx, event CounterEvent) error {
 	if transaction == nil {
 		return errors.New("counter projection transaction is required")
@@ -96,6 +98,7 @@ func (projector *CounterProjector) Handle(ctx context.Context, transaction *sql.
 	return nil
 }
 
+// Get returns the persisted counters for a video, or zero counters with the requested video ID when no row exists.
 func (projector *CounterProjector) Get(ctx context.Context, database *sql.DB, videoID string) (VideoCounters, error) {
 	var counts VideoCounters
 	err := database.QueryRowContext(ctx, `

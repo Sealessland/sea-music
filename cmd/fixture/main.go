@@ -12,6 +12,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/fixture"
 )
 
+// main runs the fixture loader, reports any failure to standard error, and exits with status 1.
 func main() {
 	if err := run(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "fixture: %v\n", err)
@@ -19,6 +20,7 @@ func main() {
 	}
 }
 
+// run loads the deterministic baseline fixture under a 20-second timeout and optionally loads a deterministic dataset, rejecting execution unless development fixtures are explicitly enabled and a database URL is set.
 func run() error {
 	if os.Getenv("SEA_ALLOW_DEVELOPMENT_FIXTURES") != "true" {
 		return fmt.Errorf("refusing to load fixtures unless SEA_ALLOW_DEVELOPMENT_FIXTURES=true")
@@ -56,6 +58,7 @@ func run() error {
 	return nil
 }
 
+// envInt returns the positive integer stored in key, uses fallback when the variable is unset, and returns an error for invalid or non-positive values.
 func envInt(key string, fallback int) (int, error) {
 	raw := os.Getenv(key)
 	if raw == "" {

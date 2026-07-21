@@ -2,6 +2,7 @@ package main
 
 import "testing"
 
+// TestParseOutboxBacklogIncludesPublishingLeases verifies that publishing events are counted with pending events while failed events remain separate.
 func TestParseOutboxBacklogIncludesPublishingLeases(t *testing.T) {
 	pending, failed, err := parseOutboxMetrics([]byte(`
 sea_music_outbox_events{state="pending"} 0
@@ -16,6 +17,7 @@ sea_music_outbox_events{state="failed"} 0
 	}
 }
 
+// TestParseOutboxBacklogRequiresAllStates verifies that parsing fails when metrics omit required outbox states.
 func TestParseOutboxBacklogRequiresAllStates(t *testing.T) {
 	_, _, err := parseOutboxMetrics([]byte(`sea_music_outbox_events{state="pending"} 1`))
 	if err == nil {

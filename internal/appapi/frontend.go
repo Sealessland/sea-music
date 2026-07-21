@@ -10,6 +10,7 @@ import (
 //go:embed web/index.html web/app.js web/styles.css
 var frontendFiles embed.FS
 
+// RegisterFrontendRoutes adds handlers for the embedded index, JavaScript, and stylesheet assets, serving them without caching and returning HTTP 500 if an asset cannot be read.
 func RegisterFrontendRoutes(router gin.IRouter) {
 	serveFrontendFile := func(path, contentType string) gin.HandlerFunc {
 		return func(context *gin.Context) {

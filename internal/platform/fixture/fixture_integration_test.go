@@ -12,6 +12,7 @@ import (
 	"github.com/sealessland/sea-music/internal/platform/migrate"
 )
 
+// TestBaselineFixtureIsDeterministicAndIdempotent applies migrations and the baseline fixture twice, then verifies PostgreSQL retains exactly one manifest row with the fixed seed, version, and load timestamp; it skips when SEA_FIXTURE_TEST_DATABASE_URL is unset.
 func TestBaselineFixtureIsDeterministicAndIdempotent(t *testing.T) {
 	databaseURL := os.Getenv("SEA_FIXTURE_TEST_DATABASE_URL")
 	if databaseURL == "" {
@@ -53,6 +54,7 @@ func TestBaselineFixtureIsDeterministicAndIdempotent(t *testing.T) {
 	}
 }
 
+// TestLoadDatasetHasDeterministicRealisticDistribution loads the same seeded dataset twice after migration and verifies the resulting user, video, and interaction counts remain at the expected deterministic distribution; it skips when SEA_FIXTURE_TEST_DATABASE_URL is unset.
 func TestLoadDatasetHasDeterministicRealisticDistribution(t *testing.T) {
 	databaseURL := os.Getenv("SEA_FIXTURE_TEST_DATABASE_URL")
 	if databaseURL == "" {

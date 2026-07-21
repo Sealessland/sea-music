@@ -7,6 +7,7 @@ import (
 	"github.com/sealessland/sea-music/internal/identity"
 )
 
+// TestOwnershipAuthorizationRejectsOtherMemberAndAllowsModerator verifies that owners may edit their own resources, ordinary members may not edit another user's resources, and moderators and admins may.
 func TestOwnershipAuthorizationRejectsOtherMemberAndAllowsModerator(t *testing.T) {
 	owner := identity.Principal{UserID: "owner", Role: "member"}
 	other := identity.Principal{UserID: "other", Role: "member"}
@@ -24,6 +25,7 @@ func TestOwnershipAuthorizationRejectsOtherMemberAndAllowsModerator(t *testing.T
 	}
 }
 
+// TestAccessTokenRejectsTamperingAndExpiry verifies that a newly issued access token fails verification after modification or after its configured lifetime has elapsed.
 func TestAccessTokenRejectsTamperingAndExpiry(t *testing.T) {
 	manager := identity.NewTokenManager([]byte("0123456789abcdef0123456789abcdef"), "sea-music", time.Minute)
 	now := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)

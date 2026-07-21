@@ -186,6 +186,8 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-local-grafana-password}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DEFAULT_INSTANCE_LANGUAGE: zh-Hans
+      GF_PLUGINS_PREINSTALL: redis-datasource,hamedkarbasi93-kafka-datasource
     depends_on:
       prometheus:
         condition: service_healthy

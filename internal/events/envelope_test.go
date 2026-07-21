@@ -8,6 +8,7 @@ import (
 	"github.com/sealessland/sea-music/internal/events"
 )
 
+// TestVersionedEnvelopeRoundTripsStableDeliveryIdentity verifies that a valid versioned envelope survives JSON serialization without changing its event ID, aggregate version, timestamp, or payload.
 func TestVersionedEnvelopeRoundTripsStableDeliveryIdentity(t *testing.T) {
 	occurredAt := time.Date(2026, 7, 13, 1, 2, 3, 0, time.UTC)
 	envelope := events.Envelope{
@@ -33,6 +34,7 @@ func TestVersionedEnvelopeRoundTripsStableDeliveryIdentity(t *testing.T) {
 	}
 }
 
+// TestEnvelopeRejectsMissingVersionAndInvalidPayload verifies that validation fails when an envelope omits its version and contains malformed JSON data.
 func TestEnvelopeRejectsMissingVersionAndInvalidPayload(t *testing.T) {
 	envelope := events.Envelope{ID: "event", Type: "video.published", Data: json.RawMessage(`{"broken"`), OccurredAt: time.Now()}
 	if err := envelope.Validate(); err == nil {

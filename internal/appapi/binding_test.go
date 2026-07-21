@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// TestBindJSONRejectsUnknownFieldsAndMultipleValues verifies that bindJSON causes requests containing unknown object fields or multiple top-level JSON values to receive HTTP 400 responses.
 func TestBindJSONRejectsUnknownFieldsAndMultipleValues(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, body := range []string{

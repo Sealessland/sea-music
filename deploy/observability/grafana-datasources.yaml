@@ -13,3 +13,35 @@ datasources:
     access: proxy
     url: http://tempo:3200
     editable: false
+
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: sea_music
+    user: sea_music
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1800
+    secureJsonData:
+      password: local-postgres-password
+    editable: true
+
+  - name: Redis
+    type: redis-datasource
+    access: proxy
+    url: redis://redis:6379
+    jsonData:
+      client: go-redis
+      db: 0
+    secureJsonData:
+      password: local-redis-password
+    editable: true
+
+  - name: Kafka
+    type: hamedkarbasi93-kafka-datasource
+    access: proxy
+    jsonData:
+      bootstrapServers: broker:9092
+      logLevel: error
+    editable: true

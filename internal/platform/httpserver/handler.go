@@ -22,10 +22,12 @@ type ReadinessChecker interface {
 // RouteRegistrar registers application routes on the Gin router.
 type RouteRegistrar func(gin.IRouter)
 
+// NewHandler constructs the instrumented Gin HTTP handler with request IDs, logging, panic recovery, security headers, health endpoints, registered application routes, and JSON 404 responses, without enabling CORS.
 func NewHandler(logger *slog.Logger, readiness ReadinessChecker, registrars ...RouteRegistrar) http.Handler {
 	return NewHandlerWithOrigins(logger, readiness, nil, registrars...)
 }
 
+// NewHandlerWithOrigins constructs the instrumented Gin HTTP handler, registers health and application routes, and enables credentialed CORS only when allowedOrigins is non-empty; readiness failures are logged and returned as 503 responses.
 func NewHandlerWithOrigins(logger *slog.Logger, readiness ReadinessChecker, allowedOrigins []string, registrars ...RouteRegistrar) http.Handler {
 	router := gin.New()
 	router.Use(requestLog(logger), recoverPanic(logger), securityHeaders())
@@ -65,6 +67,7 @@ func NewHandlerWithOrigins(logger *slog.Logger, readiness ReadinessChecker, allo
 	return httpx.WithRequestID(otelhttp.NewHandler(router, "http.server"))
 }
 
+// securityHeaders adds content-sniffing, framing, and referrer-policy protections to every response before continuing the middleware chain.
 func securityHeaders() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		context.Header("X-Content-Type-Options", "nosniff")
@@ -74,6 +77,7 @@ func securityHeaders() gin.HandlerFunc {
 	}
 }
 
+// requestLog records metrics and emits a structured completion log for each request, including method, path, matched route, status (defaulting to 200 when unset), duration, request ID, and trace ID. Note that duration is computed independently for the metrics and log calls.
 func requestLog(logger *slog.Logger) gin.HandlerFunc {
 	return func(context *gin.Context) {
 		started := time.Now()

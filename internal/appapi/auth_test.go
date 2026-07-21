@@ -12,6 +12,7 @@ import (
 	"github.com/sealessland/sea-music/internal/identity"
 )
 
+// TestOptionalAuthenticationAllowsAnonymousAndAttachesValidPrincipal verifies that optional authentication lets requests without credentials reach the handler without a principal and attaches the issued user's principal for a valid bearer token.
 func TestOptionalAuthenticationAllowsAnonymousAndAttachesValidPrincipal(t *testing.T) {
 	tokens := identity.NewTokenManager([]byte(strings.Repeat("k", 32)), "test", time.Hour)
 	auth := appapi.NewAuthenticator(tokens)
@@ -44,6 +45,7 @@ func TestOptionalAuthenticationAllowsAnonymousAndAttachesValidPrincipal(t *testi
 	}
 }
 
+// TestOptionalAuthenticationRejectsInvalidBearerToken verifies that optional authentication returns HTTP 401 for a malformed bearer token and does not invoke the next handler.
 func TestOptionalAuthenticationRejectsInvalidBearerToken(t *testing.T) {
 	auth := appapi.NewAuthenticator(identity.NewTokenManager([]byte(strings.Repeat("k", 32)), "test", time.Hour))
 	handler := gin.New()

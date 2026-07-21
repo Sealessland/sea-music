@@ -18,6 +18,7 @@ type DatasetStats struct {
 	Danmaku   int
 }
 
+// LoadDataset transactionally clears and regenerates a deterministic fixture (users, published videos, source assets, renditions, follows, likes, favorites, comments, danmaku, counters, and a fixture_manifest row), then returns the persisted row counts; it rejects a nil database, non-positive seed, fewer than 20 users, or videos outside 10..users, and rolls back all changes on failure.
 func LoadDataset(ctx context.Context, database *sql.DB, seed int64, users, videos int) (DatasetStats, error) {
 	if database == nil || seed <= 0 || users < 20 || videos < 10 || videos > users {
 		return DatasetStats{}, errors.New("dataset requires a positive seed, at least 20 users, and 10..users videos")

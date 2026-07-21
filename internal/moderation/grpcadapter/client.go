@@ -18,10 +18,12 @@ type Client struct {
 	timeout time.Duration
 }
 
+// NewClient returns a moderation client that applies timeout to each gRPC call.
 func NewClient(client moderationv1.ModerationServiceClient, timeout time.Duration) *Client {
 	return &Client{client: client, timeout: timeout}
 }
 
+// StartReview submits the request under the client's timeout and converts the initial operation, rejecting an unusable client and mapping recognized gRPC errors to moderation errors.
 func (client *Client) StartReview(ctx context.Context, request moderation.ReviewRequest) (moderation.Operation, error) {
 	if client == nil || client.client == nil || client.timeout <= 0 {
 		return moderation.Operation{}, errors.New("invalid moderation gRPC client")
@@ -43,6 +45,7 @@ func (client *Client) StartReview(ctx context.Context, request moderation.Review
 	return fromProtoOperation(operation.GetOperation())
 }
 
+// GetReview fetches and converts an operation under the client's timeout, rejecting an unusable client or blank ID and mapping recognized gRPC errors to moderation errors.
 func (client *Client) GetReview(ctx context.Context, operationID string) (moderation.Operation, error) {
 	if client == nil || client.client == nil || client.timeout <= 0 || strings.TrimSpace(operationID) == "" {
 		return moderation.Operation{}, moderation.ErrInvalidRequest
@@ -56,6 +59,7 @@ func (client *Client) GetReview(ctx context.Context, operationID string) (modera
 	return fromProtoOperation(operation.GetOperation())
 }
 
+// toProtoMode maps supported moderation modes to their protobuf equivalents and returns UNSPECIFIED for unknown values.
 func toProtoMode(mode moderation.Mode) moderationv1.ModerationMode {
 	switch mode {
 	case moderation.ModeShadow:
@@ -67,6 +71,7 @@ func toProtoMode(mode moderation.Mode) moderationv1.ModerationMode {
 	}
 }
 
+// fromProtoOperation converts a protobuf review operation, skipping nil nested entries and rejecting a missing ID, unknown status, or invalid result.
 func fromProtoOperation(value *moderationv1.ReviewOperation) (moderation.Operation, error) {
 	if value == nil || strings.TrimSpace(value.GetOperationId()) == "" {
 		return moderation.Operation{}, errors.New("invalid moderation gRPC response")
@@ -107,6 +112,7 @@ func fromProtoOperation(value *moderationv1.ReviewOperation) (moderation.Operati
 	return operation, nil
 }
 
+// fromProtoFindings converts protobuf policy findings while omitting nil entries.
 func fromProtoFindings(values []*moderationv1.PolicyFinding) []moderation.Finding {
 	findings := make([]moderation.Finding, 0, len(values))
 	for _, finding := range values {
@@ -117,6 +123,7 @@ func fromProtoFindings(values []*moderationv1.PolicyFinding) []moderation.Findin
 	return findings
 }
 
+// fromProtoStatus maps recognized protobuf review statuses to domain statuses and returns an empty status for unknown values.
 func fromProtoStatus(value moderationv1.ReviewStatus) moderation.Status {
 	switch value {
 	case moderationv1.ReviewStatus_REVIEW_STATUS_PENDING:
@@ -134,6 +141,7 @@ func fromProtoStatus(value moderationv1.ReviewStatus) moderation.Status {
 	}
 }
 
+// fromProtoVerdict maps recognized protobuf review verdicts to domain verdicts and returns an empty verdict for unknown values.
 func fromProtoVerdict(value moderationv1.ReviewVerdict) moderation.Verdict {
 	switch value {
 	case moderationv1.ReviewVerdict_REVIEW_VERDICT_APPROVE:
@@ -147,6 +155,7 @@ func fromProtoVerdict(value moderationv1.ReviewVerdict) moderation.Verdict {
 	}
 }
 
+// clientError wraps recognized gRPC status errors with their corresponding moderation sentinel error and otherwise returns the original error.
 func clientError(err error) error {
 	switch status.Code(err) {
 	case codes.InvalidArgument:

@@ -15,19 +15,23 @@ type PostgresRepository struct {
 	outbox   OutboxWriter
 }
 
+// NewPostgresRepository returns a repository that persists video data through database, with outbox delivery disabled until WithOutbox is called.
 func NewPostgresRepository(database *sql.DB) *PostgresRepository {
 	return &PostgresRepository{database: database}
 }
 
+// BeginTx starts a database transaction with the driver's default transaction options.
 func (repository *PostgresRepository) BeginTx(ctx context.Context) (*sql.Tx, error) {
 	return repository.database.BeginTx(ctx, nil)
 }
 
+// WithOutbox enables transactional domain-event enqueueing on the repository and returns the same repository for chaining.
 func (repository *PostgresRepository) WithOutbox(writer OutboxWriter) *PostgresRepository {
 	repository.outbox = writer
 	return repository
 }
 
+// CreateDraft trims and validates the title and description, then inserts and returns a draft video; invalid metadata is rejected before database access.
 func (repository *PostgresRepository) CreateDraft(ctx context.Context, creatorID, title, description string) (Video, error) {
 	title = strings.TrimSpace(title)
 	description = strings.TrimSpace(description)
@@ -49,6 +53,7 @@ func (repository *PostgresRepository) CreateDraft(ctx context.Context, creatorID
 	return video, nil
 }
 
+// Get retrieves a video by ID, returning ErrVideoNotFound when no matching row exists.
 func (repository *PostgresRepository) Get(ctx context.Context, videoID string) (Video, error) {
 	var result Video
 	err := repository.database.QueryRowContext(ctx, `
@@ -67,6 +72,7 @@ func (repository *PostgresRepository) Get(ctx context.Context, videoID string) (
 	return result, nil
 }
 
+// Transition atomically locks and validates a video transition, increments its version, records an audit entry, and emits an outbox event when publishing or withdrawing. It returns ErrVersionConflict if the conditional update does not affect exactly one row.
 func (repository *PostgresRepository) Transition(ctx context.Context, videoID, actorID string, expectedVersion int64, target State, reason string) (Video, error) {
 	transaction, err := repository.database.BeginTx(ctx, nil)
 	if err != nil {
@@ -133,6 +139,7 @@ func (repository *PostgresRepository) Transition(ctx context.Context, videoID, a
 	return next, nil
 }
 
+// BeginUpload atomically creates or reuses the draft owner's pending source asset, returning ErrUploadForbidden when the requester is not the video's creator, ErrInvalidTransition when the video is not in the draft state, and ErrInvalidUpload when an existing asset's metadata differs or its status is rejected.
 func (repository *PostgresRepository) BeginUpload(ctx context.Context, request UploadRequest) (SourceAsset, error) {
 	transaction, err := repository.database.BeginTx(ctx, nil)
 	if err != nil {
@@ -170,6 +177,7 @@ func (repository *PostgresRepository) BeginUpload(ctx context.Context, request U
 	return asset, nil
 }
 
+// GetUpload returns a creator-owned source asset, mapping a missing asset to ErrVideoNotFound and rejecting unauthorized or rejected uploads.
 func (repository *PostgresRepository) GetUpload(ctx context.Context, videoID, creatorID string) (SourceAsset, error) {
 	var asset SourceAsset
 	var ownerID string
@@ -193,6 +201,7 @@ func (repository *PostgresRepository) GetUpload(ctx context.Context, videoID, cr
 	return asset, nil
 }
 
+// RejectUpload marks an owned pending source asset as rejected, returning ErrInvalidUpload unless exactly one asset is updated.
 func (repository *PostgresRepository) RejectUpload(ctx context.Context, videoID, creatorID string) error {
 	result, err := repository.database.ExecContext(ctx, `
 		UPDATE video.source_assets a SET status = 'rejected'
@@ -212,6 +221,7 @@ func (repository *PostgresRepository) RejectUpload(ctx context.Context, videoID,
 	return nil
 }
 
+// FinalizeUpload atomically verifies a pending source asset, advances its draft video to uploaded with an audit record, and idempotently queues its processing job. An outbox event is emitted only on the first finalization, while rejected assets and unauthorized creators are refused.
 func (repository *PostgresRepository) FinalizeUpload(ctx context.Context, videoID, creatorID string) (FinalizeResult, error) {
 	transaction, err := repository.database.BeginTx(ctx, nil)
 	if err != nil {
@@ -286,6 +296,7 @@ func (repository *PostgresRepository) FinalizeUpload(ctx context.Context, videoI
 	return FinalizeResult{AssetID: asset.ID, JobID: jobID, Video: current}, nil
 }
 
+// selectSourceAsset retrieves and row-locks a video's source asset within transaction, returning ErrVideoNotFound when none exists.
 func selectSourceAsset(ctx context.Context, transaction *sql.Tx, videoID string) (SourceAsset, error) {
 	var asset SourceAsset
 	err := transaction.QueryRowContext(ctx, `
@@ -301,6 +312,7 @@ func selectSourceAsset(ctx context.Context, transaction *sql.Tx, videoID string)
 	return asset, nil
 }
 
+// selectVideoForUpdate retrieves and row-locks a video within transaction, returning ErrVideoNotFound when it does not exist.
 func selectVideoForUpdate(ctx context.Context, transaction *sql.Tx, videoID string) (Video, error) {
 	var video Video
 	err := transaction.QueryRowContext(ctx, `

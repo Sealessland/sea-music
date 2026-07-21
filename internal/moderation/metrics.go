@@ -15,6 +15,7 @@ type AgentMetrics struct {
 	duration           *prometheus.HistogramVec
 }
 
+// NewAgentMetrics creates and registers the agent evaluation counters and latency histogram, panicking if registration fails.
 func NewAgentMetrics(registerer prometheus.Registerer) *AgentMetrics {
 	metrics := &AgentMetrics{
 		evaluations: prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -44,10 +45,12 @@ type instrumentedEvaluator struct {
 	metrics *AgentMetrics
 }
 
+// InstrumentEvaluator returns an evaluator that records evaluation outcomes, policy-check failures, errors, and latency when metrics is non-nil.
 func InstrumentEvaluator(next Evaluator, metrics *AgentMetrics) Evaluator {
 	return &instrumentedEvaluator{next: next, metrics: metrics}
 }
 
+// Evaluate delegates to the wrapped evaluator, returning the result on success or a zero-valued Result with the error on failure. On error it records an error-kind counter and latency labeled "error"/"unknown". On success it records the verdict counter, per-failed-policy-check counters, and latency labeled "success"/<strategy>, defaulting an empty strategy to "single-pass".
 func (evaluator *instrumentedEvaluator) Evaluate(ctx context.Context, request ReviewRequest) (Result, error) {
 	started := time.Now()
 	result, err := evaluator.next.Evaluate(ctx, request)
@@ -74,6 +77,7 @@ func (evaluator *instrumentedEvaluator) Evaluate(ctx context.Context, request Re
 	return result, nil
 }
 
+// agentErrorKind maps recognized context and validation errors to bounded metric labels and classifies all other errors as "provider".
 func agentErrorKind(err error) string {
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):

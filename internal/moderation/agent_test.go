@@ -8,6 +8,7 @@ import (
 	"github.com/sealessland/sea-music/internal/moderation"
 )
 
+// TestAgentEscalatesReviewerCriticDisagreementWithAuditTrail verifies that conflicting reviewer and critic verdicts escalate without publication authority and retain both votes plus a failed consensus check.
 func TestAgentEscalatesReviewerCriticDisagreementWithAuditTrail(t *testing.T) {
 	agent, err := moderation.NewAgentEvaluator(
 		staticEvaluator{result: candidate(moderation.VerdictApprove, 0.99, "reviewer found no violation")},
@@ -36,6 +37,7 @@ func TestAgentEscalatesReviewerCriticDisagreementWithAuditTrail(t *testing.T) {
 	}
 }
 
+// TestAgentEscalatesUnanimousApproveBelowPolicyThreshold verifies that unanimous approval escalates at the lower confidence when either vote misses the approval threshold.
 func TestAgentEscalatesUnanimousApproveBelowPolicyThreshold(t *testing.T) {
 	agent, err := moderation.NewAgentEvaluator(
 		staticEvaluator{result: candidate(moderation.VerdictApprove, 0.89, "likely safe")},
@@ -57,6 +59,7 @@ func TestAgentEscalatesUnanimousApproveBelowPolicyThreshold(t *testing.T) {
 	}
 }
 
+// TestAgentRejectsOnlyUnanimousHighConfidenceEvidence verifies that matching reject votes above the policy threshold produce the lower confidence while merging duplicate findings at the higher score.
 func TestAgentRejectsOnlyUnanimousHighConfidenceEvidence(t *testing.T) {
 	reviewer := candidate(moderation.VerdictReject, 0.98, "targeted hate")
 	reviewer.Findings = []moderation.Finding{{Code: "hate_targeted", Category: "hate", Score: 0.98}}
@@ -81,6 +84,7 @@ func TestAgentRejectsOnlyUnanimousHighConfidenceEvidence(t *testing.T) {
 	}
 }
 
+// TestAgentPropagatesCriticFailureForDurableRetry verifies that a critic error is returned unchanged so callers can detect it and retry durably.
 func TestAgentPropagatesCriticFailureForDurableRetry(t *testing.T) {
 	want := errors.New("critic unavailable")
 	agent, err := moderation.NewAgentEvaluator(
@@ -96,6 +100,7 @@ func TestAgentPropagatesCriticFailureForDurableRetry(t *testing.T) {
 	}
 }
 
+// candidate builds a test moderation result with the supplied decision fields and fixed provider, model, and policy metadata.
 func candidate(verdict moderation.Verdict, confidence float64, summary string) moderation.Result {
 	return moderation.Result{
 		Verdict: verdict, Confidence: confidence, Summary: summary,
@@ -103,6 +108,7 @@ func candidate(verdict moderation.Verdict, confidence float64, summary string) m
 	}
 }
 
+// findCheck returns the first policy check with the requested code, or a zero-value check and false when none exists.
 func findCheck(checks []moderation.PolicyCheck, code string) (moderation.PolicyCheck, bool) {
 	for _, check := range checks {
 		if check.Code == code {
@@ -117,6 +123,7 @@ type staticEvaluator struct {
 	err    error
 }
 
+// Evaluate returns the static evaluator's preset result and error without inspecting the context or review request.
 func (e staticEvaluator) Evaluate(context.Context, moderation.ReviewRequest) (moderation.Result, error) {
 	return e.result, e.err
 }
@@ -126,6 +133,7 @@ type staticCritic struct {
 	err    error
 }
 
+// Critique returns the static critic's preset result and error without inspecting the context, review request, or reviewer result.
 func (c staticCritic) Critique(context.Context, moderation.ReviewRequest, moderation.Result) (moderation.Result, error) {
 	return c.result, c.err
 }

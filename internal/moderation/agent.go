@@ -29,6 +29,7 @@ type DecisionPolicy struct {
 	RejectThreshold  float64
 }
 
+// Validate reports an error unless both decision thresholds are within (0, 1].
 func (policy DecisionPolicy) Validate() error {
 	if policy.ApproveThreshold <= 0 || policy.ApproveThreshold > 1 ||
 		policy.RejectThreshold <= 0 || policy.RejectThreshold > 1 {
@@ -45,6 +46,7 @@ type AgentEvaluator struct {
 	policy   DecisionPolicy
 }
 
+// NewAgentEvaluator constructs an evaluator after requiring non-nil reviewer and critic dependencies and a valid decision policy.
 func NewAgentEvaluator(reviewer Evaluator, critic Critic, policy DecisionPolicy) (*AgentEvaluator, error) {
 	if reviewer == nil || critic == nil {
 		return nil, errors.New("moderation reviewer and critic are required")
@@ -55,6 +57,7 @@ func NewAgentEvaluator(reviewer Evaluator, critic Critic, policy DecisionPolicy)
 	return &AgentEvaluator{reviewer: reviewer, critic: critic, policy: policy}, nil
 }
 
+// Evaluate obtains and validates reviewer and critic evidence sequentially, records stage telemetry, and reconciles valid evidence under the decision policy; stage failures are wrapped and returned without a result.
 func (agent *AgentEvaluator) Evaluate(ctx context.Context, request ReviewRequest) (Result, error) {
 	if agent == nil || agent.reviewer == nil || agent.critic == nil {
 		return Result{}, errors.New("moderation agent evaluator is required")
@@ -111,6 +114,7 @@ func (agent *AgentEvaluator) Evaluate(ctx context.Context, request ReviewRequest
 	return result, nil
 }
 
+// reconcile emits a deterministic evidence result that escalates disagreements, explicit escalations, and confidence below the verdict-specific threshold, while preserving votes, checks, merged findings, and model identities without publication authority.
 func (agent *AgentEvaluator) reconcile(request ReviewRequest, review, critique Result) Result {
 	confidence := math.Min(review.Confidence, critique.Confidence)
 	consensus := review.Verdict == critique.Verdict
@@ -153,6 +157,7 @@ func (agent *AgentEvaluator) reconcile(request ReviewRequest, review, critique R
 	}
 }
 
+// voteFrom snapshots a stage's verdict, evidence, and model identity into a ReviewVote.
 func voteFrom(stage string, result Result) ReviewVote {
 	return ReviewVote{
 		Stage: stage, Verdict: result.Verdict, Confidence: result.Confidence,
@@ -161,6 +166,7 @@ func voteFrom(stage string, result Result) ReviewVote {
 	}
 }
 
+// mergeFindings combines groups in encounter order, deduplicating by code, category, and timestamp and retaining the highest-scoring duplicate.
 func mergeFindings(groups ...[]Finding) []Finding {
 	merged := make([]Finding, 0)
 	positions := make(map[string]int)
@@ -180,6 +186,7 @@ func mergeFindings(groups ...[]Finding) []Finding {
 	return merged
 }
 
+// combineIdentity trims two identity strings, returns the sole or shared value when possible, and joins distinct non-empty values with "+".
 func combineIdentity(left, right string) string {
 	left, right = strings.TrimSpace(left), strings.TrimSpace(right)
 	if left == right || right == "" {

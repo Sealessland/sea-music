@@ -27,6 +27,7 @@ type ReconciliationStats struct {
 	DriftTotal int64
 }
 
+// Stats returns the number of recorded drift repairs and their cumulative absolute drift.
 func (reconciler *CounterReconciler) Stats(ctx context.Context) (ReconciliationStats, error) {
 	var stats ReconciliationStats
 	if err := reconciler.database.QueryRowContext(ctx, `
@@ -37,10 +38,12 @@ func (reconciler *CounterReconciler) Stats(ctx context.Context) (ReconciliationS
 	return stats, nil
 }
 
+// NewCounterReconciler creates a reconciler backed by database and an optional Redis cache client.
 func NewCounterReconciler(database *sql.DB, client redis.UniversalClient) *CounterReconciler {
 	return &CounterReconciler{database: database, redis: client}
 }
 
+// Reconcile transactionally replaces a video's stored counters with authoritative interaction counts, records nonzero drift, and then updates Redis when available; a cache failure is returned after the database commit.
 func (reconciler *CounterReconciler) Reconcile(ctx context.Context, videoID string) (ReconciliationResult, error) {
 	transaction, err := reconciler.database.BeginTx(ctx, nil)
 	if err != nil {
@@ -99,6 +102,7 @@ func (reconciler *CounterReconciler) Reconcile(ctx context.Context, videoID stri
 	return ReconciliationResult{Before: before, After: after, DriftTotal: drift, Repaired: drift > 0}, nil
 }
 
+// ReconcileBatch reconciles up to limit least-recently-updated videos, requiring a limit from 1 through 1000, and returns the number selected and drift accumulated before any failure.
 func (reconciler *CounterReconciler) ReconcileBatch(ctx context.Context, limit int) (int, int64, error) {
 	if limit <= 0 || limit > 1000 {
 		return 0, 0, errors.New("invalid reconciliation batch size")
@@ -130,6 +134,7 @@ func (reconciler *CounterReconciler) ReconcileBatch(ctx context.Context, limit i
 	return len(videoIDs), drift, nil
 }
 
+// absolute returns the nonnegative magnitude of value.
 func absolute(value int64) int64 {
 	if value < 0 {
 		return -value

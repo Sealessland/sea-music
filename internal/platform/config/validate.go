@@ -54,8 +54,8 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.Worker.FFprobePath) == "" || strings.TrimSpace(c.Worker.FFmpegPath) == "" {
 		return errors.New("SEA_FFPROBE_PATH and SEA_FFMPEG_PATH must not be empty")
 	}
-	if c.Broker.Driver != "kafka" && c.Broker.Driver != "rocketmq" {
-		return errors.New("SEA_EVENT_BROKER: must be kafka or rocketmq")
+	if c.Broker.Driver != "kafka" && c.Broker.Driver != "rocketmq" && c.Broker.Driver != "jetstream" {
+		return errors.New("SEA_EVENT_BROKER: must be kafka, rocketmq, or jetstream")
 	}
 	if len(c.Broker.Endpoints) == 0 {
 		return fmt.Errorf("%s: at least one endpoint is required", brokerEndpointKey(c.Broker.Driver))
@@ -107,12 +107,19 @@ func (c Config) Validate() error {
 	if c.Broker.Driver == "rocketmq" && len(c.Broker.Endpoints) != 1 {
 		return errors.New("SEA_ROCKETMQ_ENDPOINT: exactly one proxy endpoint is required")
 	}
+	if c.Broker.Driver == "jetstream" && len(c.Broker.Endpoints) != 1 {
+		return errors.New("SEA_NATS_URL: exactly one server URL is required")
+	}
 	return nil
 }
 
 func brokerEndpointKey(driver string) string {
-	if driver == "rocketmq" {
+	switch driver {
+	case "rocketmq":
 		return "SEA_ROCKETMQ_ENDPOINT"
+	case "jetstream":
+		return "SEA_NATS_URL"
+	default:
+		return "SEA_KAFKA_BROKERS"
 	}
-	return "SEA_KAFKA_BROKERS"
 }

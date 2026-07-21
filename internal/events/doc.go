@@ -5,6 +5,7 @@
 //   - broker.go defines Publisher and Consumer and selects an adapter.
 //   - kafka.go contains the complete Kafka producer/consumer adapter.
 //   - rocketmq.go contains the complete RocketMQ producer/consumer adapter.
+//   - jetstream.go contains the complete NATS JetStream adapter.
 //   - dispatcher.go owns Outbox leasing and delivery state transitions.
 //   - consumer.go owns shared Inbox retries and transactional DLQ quarantine.
 //

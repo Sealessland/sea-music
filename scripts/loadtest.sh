@@ -10,14 +10,15 @@ REDIS_URL="${SEA_LOAD_REDIS_URL:-redis://:local-redis-password@127.0.0.1:26379/1
 ADDRESS="${SEA_LOAD_HTTP_ADDRESS:-127.0.0.1:38084}"
 EVENT_BROKER="${SEA_EVENT_BROKER:-kafka}"
 case "$EVENT_BROKER" in
-    kafka) BROKER_SERVICE=broker ;;
-    rocketmq) BROKER_SERVICE=rocketmq-init ;;
-    *) echo "SEA_EVENT_BROKER must be kafka or rocketmq" >&2; exit 2 ;;
+    kafka) BROKER_SERVICE=broker; COMPOSE_PROFILE=rocketmq ;;
+    rocketmq) BROKER_SERVICE=rocketmq-init; COMPOSE_PROFILE=rocketmq ;;
+    jetstream) BROKER_SERVICE=jetstream; COMPOSE_PROFILE=jetstream ;;
+    *) echo "SEA_EVENT_BROKER must be kafka, rocketmq, or jetstream" >&2; exit 2 ;;
 esac
 
-if ! docker compose --profile rocketmq up -d --wait postgres redis object-store "$BROKER_SERVICE"; then
-    docker compose --profile rocketmq ps >&2 || true
-    docker compose --profile rocketmq logs --no-color --tail=200 "$BROKER_SERVICE" >&2 || true
+if ! docker compose --profile "$COMPOSE_PROFILE" up -d --wait postgres redis object-store "$BROKER_SERVICE"; then
+    docker compose --profile "$COMPOSE_PROFILE" ps >&2 || true
+    docker compose --profile "$COMPOSE_PROFILE" logs --no-color --tail=200 "$BROKER_SERVICE" >&2 || true
     if [ "$EVENT_BROKER" = rocketmq ]; then
         docker compose --profile rocketmq logs --no-color --tail=200 rocketmq-nameserver rocketmq-broker >&2 || true
     fi

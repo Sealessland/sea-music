@@ -1,6 +1,6 @@
 # 消息队列对比
 
-Kafka 与 RocketMQ 的可比较数据由 `make queue-benchmark` 生成：每个 broker 运行相同数量的 `burst-like-toggle` 请求、并发和固定 seed 数据集；记录写路径吞吐、P95/P99、Outbox 全状态恢复时间、错误数及对应 Prometheus 快照。每次运行保存在 `artifacts/queue-benchmarks/<run-id>/`，含 JSON、`SHA256SUMS` 和环境清单；GitHub Actions 保存 14 天 artifact 并在 Job Summary 中显示中位数。
+Kafka、RocketMQ 与 JetStream 的可比较数据由 `make queue-benchmark` 生成：每个 broker 运行相同数量的 `burst-like-toggle` 请求、并发和固定 seed 数据集；记录写路径吞吐、P95/P99、Outbox 全状态恢复时间、错误数及对应 Prometheus 快照。每次运行保存在 `artifacts/queue-benchmarks/<run-id>/`，含 JSON、`SHA256SUMS` 和环境清单；GitHub Actions 保存 14 天 artifact 并在 Job Summary 中显示中位数。
 
 当前成对结果（2026-07-21，[CI run 29816342278](https://github.com/Sealessland/sea-music/actions/runs/29816342278)，每组 3 次中位数）：Kafka `1302.0 RPS / p95 32.3ms / p99 47.3ms / Outbox 恢复 0.135s`；RocketMQ `1081.2 RPS / p95 42.4ms / p99 75.0ms / Outbox 恢复 2.753s`。两组各 3,000 个总请求、0 错误。Dispatcher 在一批成功后立即继续清空积压，不再固定等待 500ms；RocketMQ 恢复时间相对修改前 [CI run 29810784083](https://github.com/Sealessland/sea-music/actions/runs/29810784083) 的 3.779s 降低 27.2%。RocketMQ 使用其 Proxy（`SEA_ROCKETMQ_ENDPOINT`），Kafka 使用 bootstrap server；协议、队列模型和 runner 噪声不同，因此结果仅能用于同一 runner、同一提交、同一参数的成对回归，不能外推为生产 SLA。
 

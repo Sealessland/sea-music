@@ -13,7 +13,7 @@ flowchart LR
     API --> Redis[(Redis)]
     API --> S3[(SeaweedFS S3)]
     PG --> Outbox[Transactional Outbox]
-    Outbox --> Broker{Kafka / RocketMQ}
+    Outbox --> Broker{Kafka / RocketMQ / JetStream}
     Broker --> Worker[Go Worker]
     Worker --> PG
     Worker --> S3
@@ -45,7 +45,8 @@ flowchart LR
 - `internal/events/broker.go`：稳定的 `Publisher` / `Consumer` 契约与运行时选择器。
 - `internal/events/kafka.go`：Kafka record、group offset 与 ack 映射。
 - `internal/events/rocketmq.go`：RocketMQ message、invisibility 与 ack 映射。
-- `internal/events/dispatcher.go` / `consumer.go`：两种 broker 共享的 Outbox、Inbox、重试、DLQ 语义。
+- `internal/events/jetstream.go`：NATS JetStream file-backed stream、durable pull consumer、显式 double ACK 映射。
+- `internal/events/dispatcher.go` / `consumer.go`：三种 broker 共享的 Outbox、Inbox、重试、DLQ 语义。
 
 业务包只写 Outbox，不导入任何 MQ SDK。新增实现只需新增适配器并在选择器注册。
 

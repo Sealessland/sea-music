@@ -192,6 +192,21 @@ func TestLoadSelectsRocketMQBroker(t *testing.T) {
 	}
 }
 
+func TestLoadSelectsJetStreamBroker(t *testing.T) {
+	values := map[string]string{
+		"SEA_AUTH_TOKEN_KEY": strings.Repeat("k", 32),
+		"SEA_EVENT_BROKER":   "jetstream",
+		"SEA_NATS_URL":       "nats://127.0.0.1:4222",
+	}
+	cfg, err := config.LoadFrom(mapLookup(values))
+	if err != nil {
+		t.Fatalf("LoadFrom() error = %v", err)
+	}
+	if cfg.Broker.Driver != "jetstream" || len(cfg.Broker.Endpoints) != 1 || cfg.Broker.Endpoints[0] != "nats://127.0.0.1:4222" {
+		t.Fatalf("Broker = %+v", cfg.Broker)
+	}
+}
+
 func TestLoadRejectsUnknownEventBroker(t *testing.T) {
 	_, err := config.LoadFrom(mapLookup(map[string]string{
 		"SEA_AUTH_TOKEN_KEY": strings.Repeat("k", 32),

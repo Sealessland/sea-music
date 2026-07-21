@@ -23,6 +23,24 @@ func TestRocketMQEndpointRequiresExactlyOneProxy(t *testing.T) {
 	}
 }
 
+func TestJetStreamRequiresExactlyOneServerURL(t *testing.T) {
+	t.Parallel()
+
+	for _, endpoints := range [][]string{nil, {}, {""}, {"nats://a:4222", "nats://b:4222"}} {
+		if _, err := jetStreamEndpoint(endpoints); err == nil {
+			t.Fatalf("jetStreamEndpoint(%q) succeeded, want validation error", endpoints)
+		}
+	}
+
+	endpoint, err := jetStreamEndpoint([]string{" nats://127.0.0.1:4222 "})
+	if err != nil {
+		t.Fatalf("jetStreamEndpoint() error = %v", err)
+	}
+	if endpoint != "nats://127.0.0.1:4222" {
+		t.Fatalf("jetStreamEndpoint() = %q", endpoint)
+	}
+}
+
 func TestNewPublisherRejectsUnsupportedBroker(t *testing.T) {
 	t.Parallel()
 

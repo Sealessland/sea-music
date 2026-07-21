@@ -162,8 +162,12 @@ func defaults(lookup LookupEnv) Config {
 }
 
 func brokerEndpoints(lookup LookupEnv) []string {
-	if valueOrDefault(lookup, "SEA_EVENT_BROKER", "kafka") == "rocketmq" {
+	switch valueOrDefault(lookup, "SEA_EVENT_BROKER", "kafka") {
+	case "rocketmq":
 		return splitNonEmpty(valueOrDefault(lookup, "SEA_ROCKETMQ_ENDPOINT", "127.0.0.1:28081"))
+	case "jetstream":
+		return splitNonEmpty(valueOrDefault(lookup, "SEA_NATS_URL", "nats://127.0.0.1:24222"))
+	default:
+		return splitNonEmpty(valueOrDefault(lookup, "SEA_KAFKA_BROKERS", "127.0.0.1:29092"))
 	}
-	return splitNonEmpty(valueOrDefault(lookup, "SEA_KAFKA_BROKERS", "127.0.0.1:29092"))
 }

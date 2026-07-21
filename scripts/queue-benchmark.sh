@@ -18,7 +18,7 @@ printf 'run_id=%s\nrepeats=%s\nrequests=%s\nconcurrency=%s\n' \
 
 repeat=1
 while [ "$repeat" -le "$REPEATS" ]; do
-    for broker in kafka rocketmq; do
+    for broker in kafka rocketmq jetstream; do
         mkdir -p "$RUN_DIR/$broker"
         result="$RUN_DIR/$broker/run-$repeat.json"
         SEA_EVENT_BROKER="$broker" \
@@ -46,10 +46,11 @@ jq -s '
   };
   {schema_version: 1, methodology: "loadtest burst-like-toggle; identical request/concurrency settings", variants: {
     kafka: ([.[] | select(.event_broker == "kafka")] | aggregate),
-    rocketmq: ([.[] | select(.event_broker == "rocketmq")] | aggregate)
+    rocketmq: ([.[] | select(.event_broker == "rocketmq")] | aggregate),
+    jetstream: ([.[] | select(.event_broker == "jetstream")] | aggregate)
   }}
 ' "$RUN_DIR"/*/run-*.json >"$RUN_DIR/report.json"
 
-(cd "$RUN_DIR" && sha256sum environment.txt kafka/run-*.json rocketmq/run-*.json >SHA256SUMS)
+(cd "$RUN_DIR" && sha256sum environment.txt kafka/run-*.json rocketmq/run-*.json jetstream/run-*.json >SHA256SUMS)
 cat "$RUN_DIR/report.json"
 printf '\narchive=%s\n' "$RUN_DIR"

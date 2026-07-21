@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	BrokerKafka    = "kafka"
-	BrokerRocketMQ = "rocketmq"
+	BrokerKafka     = "kafka"
+	BrokerRocketMQ  = "rocketmq"
+	BrokerJetStream = "jetstream"
 )
 
 // Publisher is the broker-independent boundary used by the Outbox dispatcher.
@@ -50,6 +51,12 @@ func NewPublisher(config BrokerConfig, topics ...string) (Publisher, error) {
 			return nil, err
 		}
 		return NewRocketMQPublisher(endpoint, config.AccessKey, config.AccessSecret, topics)
+	case BrokerJetStream:
+		endpoint, err := jetStreamEndpoint(config.Endpoints)
+		if err != nil {
+			return nil, err
+		}
+		return NewJetStreamPublisher(context.Background(), endpoint, topics)
 	default:
 		return nil, fmt.Errorf("unsupported event broker %q", config.Driver)
 	}
@@ -67,6 +74,12 @@ func NewConsumer(config BrokerConfig, consumerConfig ConsumerConfig, inbox *Inbo
 			return nil, err
 		}
 		return NewRocketMQConsumer(endpoint, config.AccessKey, config.AccessSecret, consumerConfig, inbox, repository)
+	case BrokerJetStream:
+		endpoint, err := jetStreamEndpoint(config.Endpoints)
+		if err != nil {
+			return nil, err
+		}
+		return NewJetStreamConsumer(context.Background(), endpoint, consumerConfig, inbox, repository)
 	default:
 		return nil, fmt.Errorf("unsupported event broker %q", config.Driver)
 	}
@@ -83,6 +96,13 @@ func encodeEnvelope(envelope Envelope) ([]byte, error) {
 func rocketMQEndpoint(endpoints []string) (string, error) {
 	if len(endpoints) != 1 || strings.TrimSpace(endpoints[0]) == "" {
 		return "", errors.New("RocketMQ requires exactly one proxy endpoint")
+	}
+	return strings.TrimSpace(endpoints[0]), nil
+}
+
+func jetStreamEndpoint(endpoints []string) (string, error) {
+	if len(endpoints) != 1 || strings.TrimSpace(endpoints[0]) == "" {
+		return "", errors.New("JetStream requires exactly one NATS server URL")
 	}
 	return strings.TrimSpace(endpoints[0]), nil
 }

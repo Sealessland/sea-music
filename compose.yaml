@@ -85,6 +85,22 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  jetstream:
+    image: nats:2.14.3-alpine
+    profiles: ["jetstream"]
+    command: ["--jetstream", "--store_dir", "/data", "--http_port", "8222"]
+    ports:
+      - "${NATS_PORT:-24222}:4222"
+    volumes:
+      - jetstream-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q 'http://127.0.0.1:8222/healthz?js-enabled-only=true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+
   rocketmq-nameserver:
     image: apache/rocketmq:5.3.2
     profiles: ["rocketmq"]
@@ -211,6 +227,7 @@ volumes:
   redis-data:
   object-store-data:
   broker-data:
+  jetstream-data:
   tempo-data:
   prometheus-data:
   grafana-data:

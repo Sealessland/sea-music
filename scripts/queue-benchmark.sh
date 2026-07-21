@@ -25,8 +25,7 @@ while [ "$repeat" -le "$REPEATS" ]; do
         SEA_LOAD_OUTPUT_DIR="$RUN_DIR/$broker" \
         SEA_LOAD_HTTP_ADDRESS="127.0.0.1:$((38100 + repeat))" \
         ./scripts/loadtest.sh >"$RUN_DIR/$broker/run-$repeat.path"
-        generated=$(cat "$RUN_DIR/$broker/run-$repeat.path")
-        test -s "$generated"
+        generated=$(sed -n '$p' "$RUN_DIR/$broker/run-$repeat.path")
         cp "$generated" "$result"
     done
     repeat=$((repeat + 1))

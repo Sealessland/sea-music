@@ -122,7 +122,7 @@ flowchart LR
 - 固定 seed `20260713` 数据集：1,000 用户、500 视频、5,000 关注、4,000 点赞、1,500 收藏、1,000 评论、1,500 弹幕。
 - **签名 URL 缓存 A/B**（closed-model，三次中位数）：视频详情吞吐 2998 → 3645 RPS（+21.6%），p99 降低 12.0%，3,000 个 A/B 请求 0 错误。
 - **k6 open-model 复测**（`constant-arrival-rate`，pareto80 访问分布，500 RPS）：缓存组 p95 6.1ms vs 无缓存 36.0ms（-83%），p99 13.7ms vs 92.7ms（-85%），`dropped_iterations=0`，错误率 0。方法见 [benchmark-methodology](docs/performance/benchmark-methodology.md)。
-- **消息队列对比**：Kafka 与 RocketMQ 使用相同的 Outbox、Inbox、DLQ、重试、backlog-recovery smoke 口径；`make queue-benchmark` 将每个真实依赖的 JSON 与 Prometheus 证据归档为 CI artifact。此分支尚无可信 RocketMQ 数值，首个 CI 运行后才可填写比较表，避免将 Kafka 基线伪装为 RocketMQ 结果。
+- **消息队列对比**（GitHub `ubuntu-24.04` runner，同提交、500 写请求 × 3 次中位数）：Kafka `869.0 RPS / p95 53.2ms / p99 86.1ms / Outbox 恢复 1.346s`；RocketMQ `899.5 RPS / p95 50.4ms / p99 66.9ms / Outbox 恢复 3.779s`；两组各 3,000 个总请求、0 错误。RocketMQ 写路径吞吐高 3.5%，但全链路恢复慢 2.8×；原始 JSON/Prometheus/SHA256 见 [CI run 29810784083](https://github.com/Sealessland/sea-music/actions/runs/29810784083)，仅作为该 runner 的成对比较，不外推为生产 SLA。
 
 ## 快速开始
 

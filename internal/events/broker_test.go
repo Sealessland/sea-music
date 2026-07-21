@@ -58,3 +58,16 @@ func TestNewConsumerRejectsUnsupportedBrokerBeforeDependencies(t *testing.T) {
 		t.Fatalf("NewConsumer() error = %v, want unsupported event broker", err)
 	}
 }
+
+func TestRocketMQTopicTranslatesUnsupportedCharacters(t *testing.T) {
+	t.Parallel()
+
+	for input, want := range map[string]string{
+		"domain-events":     "domain-events",
+		"domain-events.dlq": "domain-events_dlq",
+	} {
+		if got := rocketMQTopic(input); got != want {
+			t.Errorf("rocketMQTopic(%q) = %q, want %q", input, got, want)
+		}
+	}
+}

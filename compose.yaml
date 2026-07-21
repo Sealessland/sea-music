@@ -143,7 +143,7 @@ services:
       - -c
       - >-
         sh mqadmin updateTopic -n rocketmq-nameserver:9876 -c DefaultCluster -t domain-events
-        && sh mqadmin updateTopic -n rocketmq-nameserver:9876 -c DefaultCluster -t domain-events.dlq
+        && sh mqadmin updateTopic -n rocketmq-nameserver:9876 -c DefaultCluster -t domain-events_dlq
     restart: "no"
 
   tempo:

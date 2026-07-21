@@ -18,7 +18,16 @@ var (
 	_ Consumer  = (*RocketMQConsumer)(nil)
 )
 
-const rocketMQInvisibleDuration = 30 * time.Second
+const (
+	rocketMQFetchWait         = 30 * time.Second
+	rocketMQInvisibleDuration = 30 * time.Second
+)
+
+var rocketMQTopicPart = strings.NewReplacer(".", "_")
+
+func rocketMQTopic(topic string) string {
+	return rocketMQTopicPart.Replace(topic)
+}
 
 type rocketMQMessage interface {
 	Body() []byte
@@ -78,7 +87,7 @@ func newRocketMQSimpleConsumer(endpoint, accessKey, accessSecret, topic, group s
 	rmq.EnableSsl = false
 	consumer, err := rmq.NewSimpleConsumer(
 		rocketMQConfig(endpoint, accessKey, accessSecret, group),
-		rmq.WithSimpleAwaitDuration(time.Second),
+		rmq.WithSimpleAwaitDuration(rocketMQFetchWait),
 		rmq.WithSimpleSubscriptionExpressions(map[string]*rmq.FilterExpression{topic: rmq.SUB_ALL}),
 	)
 	if err != nil {
@@ -101,7 +110,11 @@ func NewRocketMQPublisher(endpoint, accessKey, accessSecret string, topics []str
 		return nil, errors.New("RocketMQ endpoint and at least one topic are required")
 	}
 	rmq.EnableSsl = false
-	producer, err := rmq.NewProducer(rocketMQConfig(endpoint, accessKey, accessSecret, ""), rmq.WithTopics(topics...))
+	mappedTopics := make([]string, len(topics))
+	for index, topic := range topics {
+		mappedTopics[index] = rocketMQTopic(topic)
+	}
+	producer, err := rmq.NewProducer(rocketMQConfig(endpoint, accessKey, accessSecret, ""), rmq.WithTopics(mappedTopics...))
 	if err != nil {
 		return nil, fmt.Errorf("create RocketMQ producer: %w", err)
 	}
@@ -116,7 +129,7 @@ func (publisher *RocketMQPublisher) Publish(ctx context.Context, event OutboxEve
 	if err != nil {
 		return err
 	}
-	message := &rmq.Message{Topic: event.Topic, Body: value}
+	message := &rmq.Message{Topic: rocketMQTopic(event.Topic), Body: value}
 	message.SetKeys(event.Envelope.ID, event.Envelope.AggregateID)
 	message.AddProperty("event_type", event.Envelope.Type)
 	message.AddProperty("traceparent", event.Envelope.TraceParent)
@@ -154,7 +167,7 @@ func NewRocketMQConsumer(endpoint, accessKey, accessSecret string, config Consum
 	if strings.TrimSpace(endpoint) == "" {
 		return nil, errors.New("RocketMQ endpoint is required")
 	}
-	client, err := newRocketMQSimpleConsumer(endpoint, accessKey, accessSecret, config.Topic, config.Group)
+	client, err := newRocketMQSimpleConsumer(endpoint, accessKey, accessSecret, rocketMQTopic(config.Topic), config.Group)
 	if err != nil {
 		return nil, err
 	}

@@ -91,8 +91,6 @@ services:
     command: ["sh", "mqnamesrv"]
     ports:
       - "${ROCKETMQ_NAMESERVER_PORT:-29876}:9876"
-    volumes:
-      - rocketmq-nameserver-logs:/home/rocketmq/logs
     healthcheck:
       test: ["CMD-SHELL", "sh mqadmin clusterList -n 127.0.0.1:9876 >/dev/null 2>&1"]
       interval: 5s
@@ -110,9 +108,6 @@ services:
         condition: service_healthy
     ports:
       - "${ROCKETMQ_PROXY_PORT:-28081}:8081"
-    volumes:
-      - rocketmq-broker-logs:/home/rocketmq/logs
-      - rocketmq-broker-store:/home/rocketmq/store
     healthcheck:
       test: ["CMD-SHELL", "sh mqadmin clusterList -n rocketmq-nameserver:9876 2>/dev/null | grep -q DefaultCluster"]
       interval: 5s
@@ -216,9 +211,6 @@ volumes:
   redis-data:
   object-store-data:
   broker-data:
-  rocketmq-nameserver-logs:
-  rocketmq-broker-logs:
-  rocketmq-broker-store:
   tempo-data:
   prometheus-data:
   grafana-data:

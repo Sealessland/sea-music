@@ -193,6 +193,9 @@ func runEventLoop(ctx context.Context, dispatcher *events.Dispatcher, pollInterv
 		} else if count > 0 {
 			logger.InfoContext(ctx, "outbox batch dispatched", "events", count)
 		}
+		if shouldImmediatelyDispatchAgain(count, err) {
+			continue
+		}
 		timer := time.NewTimer(pollInterval)
 		select {
 		case <-ctx.Done():
@@ -201,4 +204,7 @@ func runEventLoop(ctx context.Context, dispatcher *events.Dispatcher, pollInterv
 		case <-timer.C:
 		}
 	}
+}
+func shouldImmediatelyDispatchAgain(dispatched int, err error) bool {
+	return err == nil && dispatched > 0
 }

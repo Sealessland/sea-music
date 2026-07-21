@@ -1,8 +1,8 @@
 # 消息队列对比
 
-Kafka、RocketMQ 与 JetStream 的可比较数据由 `make queue-benchmark` 生成：每个 broker 运行相同数量的 `burst-like-toggle` 请求、并发和固定 seed 数据集；记录写路径吞吐、P95/P99、Outbox 全状态恢复时间、错误数及对应 Prometheus 快照。每次运行保存在 `artifacts/queue-benchmarks/<run-id>/`，含 JSON、`SHA256SUMS` 和环境清单；GitHub Actions 保存 14 天 artifact 并在 Job Summary 中显示中位数。
+Kafka、RocketMQ 与 JetStream 的可比较数据由 `make queue-benchmark` 生成：每个 broker × 每轮使用独立 Compose project、独立端口及独立 Postgres/Redis/S3/broker 命名卷，结束时执行 `down -v`；三方运行相同数量的 `burst-like-toggle` 请求、并发和固定 seed 数据集。记录包含写路径吞吐、P95/P99、Outbox 全状态恢复时间、错误数及对应 Prometheus 快照。每次运行保存在 `artifacts/queue-benchmarks/<run-id>/`，含 JSON、`SHA256SUMS` 和环境清单；GitHub Actions 保存 14 天 artifact 并在 Job Summary 中显示中位数。
 
-当前三方结果（2026-07-21，[CI run 29822812646](https://github.com/Sealessland/sea-music/actions/runs/29822812646)，每组 3 次中位数；固定 500 请求、并发 16）：Kafka `1456.5 RPS / p95 27.8ms / p99 37.3ms / Outbox 恢复 0.436s`；RocketMQ `783.2 RPS / p95 61.3ms / p99 101.2ms / Outbox 恢复 2.243s`；JetStream `1294.7 RPS / p95 32.8ms / p99 49.6ms / Outbox 恢复 0.077s`。每个 broker 共 3,000 个总请求，0 错误。证据 artifact `queue-benchmark-29822812646-1` 的 SHA-256 为 `58d87af6ee256cba6e8c7809d5b55029e1e24ae71391d1d1e293dd9175393c4f`。Kafka 使用 bootstrap server，RocketMQ 使用 Proxy（`SEA_ROCKETMQ_ENDPOINT`），JetStream 使用单节点 file-backed stream；协议、队列模型和 runner 噪声不同，结果仅适用于同一 runner、提交和参数的成对回归，不外推为生产 SLA。
+当前三方结果（2026-07-21，[CI run 29824036411](https://github.com/Sealessland/sea-music/actions/runs/29824036411)，每组 3 次中位数；固定 500 请求、并发 16；每轮全新且相互隔离的数据与 broker 状态）：Kafka `1339.0 RPS / p95 31.0ms / p99 45.5ms / Outbox 恢复 0.600s`；RocketMQ `901.5 RPS / p95 48.1ms / p99 90.3ms / Outbox 恢复 2.652s`；JetStream `1437.4 RPS / p95 28.8ms / p99 48.6ms / Outbox 恢复 0.081s`。每个 broker 共 3,000 个总请求，0 错误。证据 artifact `queue-benchmark-29824036411-1` 的 SHA-256 为 `8545973078b22b266b75c11aef92566a92afb1037efd4c6eeb70d4ee1e3ed2db`。Kafka 使用 bootstrap server，RocketMQ 使用 Proxy（`SEA_ROCKETMQ_ENDPOINT`），JetStream 使用单节点 file-backed stream；协议、队列模型和 runner 噪声不同，结果仅适用于同一 runner、提交和参数的成对回归，不外推为生产 SLA。
 
 
 # 固定环境性能基线与优化

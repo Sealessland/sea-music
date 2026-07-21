@@ -72,7 +72,7 @@ type Worker struct {
 
 type Broker struct {
 	Driver       string
-	Brokers      []string
+	Endpoints    []string
 	AccessKey    string
 	AccessSecret string
 }

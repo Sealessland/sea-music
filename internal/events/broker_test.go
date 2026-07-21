@@ -31,3 +31,12 @@ func TestNewPublisherRejectsUnsupportedBroker(t *testing.T) {
 		t.Fatalf("NewPublisher() error = %v, want unsupported event broker", err)
 	}
 }
+
+func TestNewConsumerRejectsUnsupportedBrokerBeforeDependencies(t *testing.T) {
+	t.Parallel()
+
+	_, err := NewConsumer(BrokerConfig{Driver: "unknown"}, ConsumerConfig{}, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "unsupported event broker") {
+		t.Fatalf("NewConsumer() error = %v, want unsupported event broker", err)
+	}
+}

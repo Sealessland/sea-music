@@ -187,7 +187,7 @@ func TestLoadSelectsRocketMQBroker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFrom() error = %v", err)
 	}
-	if cfg.Broker.Driver != "rocketmq" || len(cfg.Broker.Brokers) != 1 || cfg.Broker.Brokers[0] != "127.0.0.1:8081" {
+	if cfg.Broker.Driver != "rocketmq" || len(cfg.Broker.Endpoints) != 1 || cfg.Broker.Endpoints[0] != "127.0.0.1:8081" {
 		t.Fatalf("Broker = %+v", cfg.Broker)
 	}
 }

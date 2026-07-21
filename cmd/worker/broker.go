@@ -7,7 +7,7 @@ import (
 
 func eventBrokerConfig(cfg config.Config) events.BrokerConfig {
 	return events.BrokerConfig{
-		Driver: cfg.Broker.Driver, Endpoints: cfg.Broker.Brokers,
+		Driver: cfg.Broker.Driver, Endpoints: cfg.Broker.Endpoints,
 		AccessKey: cfg.Broker.AccessKey, AccessSecret: cfg.Broker.AccessSecret,
 	}
 }

@@ -57,7 +57,7 @@ func (c Config) Validate() error {
 	if c.Broker.Driver != "kafka" && c.Broker.Driver != "rocketmq" {
 		return errors.New("SEA_EVENT_BROKER: must be kafka or rocketmq")
 	}
-	if len(c.Broker.Brokers) == 0 {
+	if len(c.Broker.Endpoints) == 0 {
 		return fmt.Errorf("%s: at least one endpoint is required", brokerEndpointKey(c.Broker.Driver))
 	}
 	if strings.TrimSpace(c.Moderation.GRPCAddress) == "" {
@@ -99,12 +99,12 @@ func (c Config) Validate() error {
 	if c.Moderation.EvaluationTimeout >= c.Moderation.LeaseDuration {
 		return errors.New("SEA_MODERATION_EVALUATION_TIMEOUT: must be shorter than SEA_MODERATION_LEASE_DURATION")
 	}
-	for _, broker := range c.Broker.Brokers {
-		if strings.TrimSpace(broker) == "" {
+	for _, endpoint := range c.Broker.Endpoints {
+		if strings.TrimSpace(endpoint) == "" {
 			return fmt.Errorf("%s: endpoint addresses must not be empty", brokerEndpointKey(c.Broker.Driver))
 		}
 	}
-	if c.Broker.Driver == "rocketmq" && len(c.Broker.Brokers) != 1 {
+	if c.Broker.Driver == "rocketmq" && len(c.Broker.Endpoints) != 1 {
 		return errors.New("SEA_ROCKETMQ_ENDPOINT: exactly one proxy endpoint is required")
 	}
 	return nil

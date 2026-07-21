@@ -118,7 +118,7 @@ func defaults(lookup LookupEnv) Config {
 		},
 		Broker: Broker{
 			Driver:       valueOrDefault(lookup, "SEA_EVENT_BROKER", "kafka"),
-			Brokers:      brokerEndpoints(lookup),
+			Endpoints:    brokerEndpoints(lookup),
 			AccessKey:    valueOrDefault(lookup, "SEA_ROCKETMQ_ACCESS_KEY", ""),
 			AccessSecret: valueOrDefault(lookup, "SEA_ROCKETMQ_ACCESS_SECRET", ""),
 		},

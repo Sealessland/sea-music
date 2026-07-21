@@ -77,12 +77,14 @@ flowchart LR
 
 1. 客户端创建草稿，API 生成用户隔离的对象 key 和短期 S3 PUT 预签名 URL，客户端直传源文件。
 2. finalize 重新读取对象并核验长度、Content-Type 和 SHA-256，在**同一事务**中推进状态机、幂等入队转码任务并写 Outbox。
-3. Dispatcher 只有收到 Kafka ack 后才确认 Outbox 行；Worker 通过 Inbox 去重并领取带租约的处理任务。
-4. Worker 完成转码后，在同一事务写 `video.ready_for_moderation`；Kafka Inbox 幂等落本地 dispatch job，独立租约循环调用 gRPC Agent 并回收结果。
+3. Dispatcher 只有收到所选 broker 的持久化 ack 后才确认 Outbox 行；Worker 通过统一 `events.Consumer` 接口消费，并用 Inbox 去重。
+4. Worker 完成转码后，在同一事务写 `video.ready_for_moderation`；消费端在 Inbox 事务中幂等落本地 dispatch job，独立租约循环调用 gRPC Agent 并回收结果。
 5. Agent 先由 reviewer 生成结构化候选证据，再由独立 critic 反证；确定性策略引擎要求 verdict 一致且达到配置阈值，否则升级人工。默认 shadow 模式和无 provider fallback 都不能改变视频状态，视频领域仍独占发布授权。
 6. 点赞/收藏/关注/评论/弹幕先写权威关系及 Outbox，消费者异步投影计数和热门分数；周期对账修复漂移。
 
 关键决策记录：[ADR 0001 模块化单体](docs/adr/0001-modular-monolith.md)、[ADR 0002 Transactional Outbox](docs/adr/0002-transactional-outbox.md)、[ADR 0003 直传与真实媒体处理](docs/adr/0003-direct-upload-media.md)。
+
+消息队列代码按阅读职责拆分：`internal/events/broker.go` 只定义契约和选择实现，`kafka.go` / `rocketmq.go` 分别包含完整适配器，`dispatcher.go` / `consumer.go` 保留所有 broker 共享的 Outbox、Inbox、重试和 DLQ 语义。新增第三种 MQ 时只增加适配器文件并在 `broker.go` 注册，不修改业务模块。
 
 ## 核心设计
 

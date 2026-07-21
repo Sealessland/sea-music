@@ -114,7 +114,7 @@ services:
       - rocketmq-broker-logs:/home/rocketmq/logs
       - rocketmq-broker-store:/home/rocketmq/store
     healthcheck:
-      test: ["CMD-SHELL", "sh mqadmin clusterList -n rocketmq-nameserver:9876 >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "sh mqadmin clusterList -n rocketmq-nameserver:9876 2>/dev/null | grep -q DefaultCluster"]
       interval: 5s
       timeout: 5s
       retries: 30

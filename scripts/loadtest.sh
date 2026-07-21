@@ -15,7 +15,14 @@ case "$EVENT_BROKER" in
     *) echo "SEA_EVENT_BROKER must be kafka or rocketmq" >&2; exit 2 ;;
 esac
 
-docker compose --profile rocketmq up -d --wait postgres redis object-store "$BROKER_SERVICE"
+if ! docker compose --profile rocketmq up -d --wait postgres redis object-store "$BROKER_SERVICE"; then
+    docker compose --profile rocketmq ps >&2 || true
+    docker compose --profile rocketmq logs --no-color --tail=200 "$BROKER_SERVICE" >&2 || true
+    if [ "$EVENT_BROKER" = rocketmq ]; then
+        docker compose --profile rocketmq logs --no-color --tail=200 rocketmq-nameserver rocketmq-broker >&2 || true
+    fi
+    exit 1
+fi
 SEA_DATABASE_URL="$DATABASE_URL" go run -buildvcs=false ./cmd/migrate up
 SEA_ALLOW_DEVELOPMENT_FIXTURES=true SEA_LOAD_DATASET=true \
 SEA_LOAD_DATASET_USERS="${SEA_LOAD_DATASET_USERS:-1000}" \

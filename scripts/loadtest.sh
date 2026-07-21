@@ -9,12 +9,37 @@ DATABASE_URL="${SEA_LOAD_DATABASE_URL:-postgres://sea_music:local-postgres-passw
 REDIS_URL="${SEA_LOAD_REDIS_URL:-redis://:local-redis-password@127.0.0.1:26379/11}"
 ADDRESS="${SEA_LOAD_HTTP_ADDRESS:-127.0.0.1:38084}"
 EVENT_BROKER="${SEA_EVENT_BROKER:-kafka}"
+RESET_COMPOSE="${SEA_LOAD_RESET_COMPOSE:-false}"
+case "$RESET_COMPOSE" in
+    true|false) ;;
+    *) echo "SEA_LOAD_RESET_COMPOSE must be true or false" >&2; exit 2 ;;
+esac
+
+API_PID=""
+WORKER_PID=""
+cleanup() {
+    for pid in "$WORKER_PID" "$API_PID"; do
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            kill -TERM "$pid"
+            wait "$pid" || true
+        fi
+    done
+    if [ "$RESET_COMPOSE" = true ]; then
+        docker compose --profile rocketmq --profile jetstream down --volumes --remove-orphans >/dev/null 2>&1 || true
+    fi
+}
+trap cleanup EXIT INT TERM
+
 case "$EVENT_BROKER" in
     kafka) BROKER_SERVICE=broker; COMPOSE_PROFILE=rocketmq ;;
     rocketmq) BROKER_SERVICE=rocketmq-init; COMPOSE_PROFILE=rocketmq ;;
     jetstream) BROKER_SERVICE=jetstream; COMPOSE_PROFILE=jetstream ;;
     *) echo "SEA_EVENT_BROKER must be kafka, rocketmq, or jetstream" >&2; exit 2 ;;
 esac
+
+if [ "$RESET_COMPOSE" = true ]; then
+    docker compose --profile rocketmq --profile jetstream down --volumes --remove-orphans >/dev/null 2>&1 || true
+fi
 
 if ! docker compose --profile "$COMPOSE_PROFILE" up -d --wait postgres redis object-store "$BROKER_SERVICE"; then
     docker compose --profile "$COMPOSE_PROFILE" ps >&2 || true
@@ -24,6 +49,7 @@ if ! docker compose --profile "$COMPOSE_PROFILE" up -d --wait postgres redis obj
     fi
     exit 1
 fi
+
 SEA_DATABASE_URL="$DATABASE_URL" go run -buildvcs=false ./cmd/migrate up
 SEA_ALLOW_DEVELOPMENT_FIXTURES=true SEA_LOAD_DATASET=true \
 SEA_LOAD_DATASET_USERS="${SEA_LOAD_DATASET_USERS:-1000}" \
@@ -48,15 +74,6 @@ SEA_DATABASE_URL="$DATABASE_URL" SEA_REDIS_URL="$REDIS_URL" SEA_COUNTER_RECONCIL
 "$WORKER_BINARY" >/tmp/sea-music-worker-load.log 2>&1 &
 WORKER_PID=$!
 
-cleanup() {
-    for pid in "$WORKER_PID" "$API_PID"; do
-        if kill -0 "$pid" 2>/dev/null; then
-            kill -TERM "$pid"
-            wait "$pid" || true
-        fi
-    done
-}
-trap cleanup EXIT INT TERM
 
 attempt=0
 until curl --fail --silent --show-error "http://$ADDRESS/readyz" >/dev/null; do

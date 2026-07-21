@@ -7,6 +7,8 @@ cd "$ROOT"
 RUN_ID="${SEA_QUEUE_BENCH_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 RUN_DIR="artifacts/queue-benchmarks/$RUN_ID"
 REPEATS="${SEA_QUEUE_BENCH_REPEATS:-3}"
+PROJECT_PREFIX=$(printf '%s' "sea-music-bench-$RUN_ID" | tr '[:upper:]_' '[:lower:]-' | tr -cd 'a-z0-9-')
+
 
 case "$REPEATS" in
     *[!0-9]*|0) echo "SEA_QUEUE_BENCH_REPEATS must be a positive integer" >&2; exit 2 ;;
@@ -18,13 +20,32 @@ printf 'run_id=%s\nrepeats=%s\nrequests=%s\nconcurrency=%s\n' \
 
 repeat=1
 while [ "$repeat" -le "$REPEATS" ]; do
+    broker_index=0
     for broker in kafka rocketmq jetstream; do
+        broker_index=$((broker_index + 1))
+        slot=$(((repeat - 1) * 3 + broker_index))
+        port_offset=$((slot * 20))
+        project="$PROJECT_PREFIX-$broker-$repeat"
         mkdir -p "$RUN_DIR/$broker"
         result="$RUN_DIR/$broker/run-$repeat.json"
-        docker compose --profile rocketmq --profile jetstream stop broker rocketmq-init rocketmq-broker rocketmq-nameserver jetstream >/dev/null 2>&1 || true
+        COMPOSE_PROJECT_NAME="$project" \
+        POSTGRES_PORT=$((25432 + port_offset)) \
+        REDIS_PORT=$((26379 + port_offset)) \
+        S3_PORT=$((28333 + port_offset)) \
+        SEAWEED_MASTER_PORT=$((29333 + port_offset)) \
+        KAFKA_PORT=$((29092 + port_offset)) \
+        ROCKETMQ_NAMESERVER_PORT=$((29876 + port_offset)) \
+        ROCKETMQ_PROXY_PORT=$((28081 + port_offset)) \
+        NATS_PORT=$((24222 + port_offset)) \
+        SEA_KAFKA_BROKERS="127.0.0.1:$((29092 + port_offset))" \
+        SEA_ROCKETMQ_ENDPOINT="127.0.0.1:$((28081 + port_offset))" \
+        SEA_NATS_URL="nats://127.0.0.1:$((24222 + port_offset))" \
+        SEA_LOAD_DATABASE_URL="postgres://sea_music:local-postgres-password@127.0.0.1:$((25432 + port_offset))/sea_music?sslmode=disable" \
+        SEA_LOAD_REDIS_URL="redis://:local-redis-password@127.0.0.1:$((26379 + port_offset))/11" \
+        SEA_LOAD_RESET_COMPOSE=true \
         SEA_EVENT_BROKER="$broker" \
         SEA_LOAD_OUTPUT_DIR="$RUN_DIR/$broker" \
-        SEA_LOAD_HTTP_ADDRESS="127.0.0.1:$((38100 + repeat))" \
+        SEA_LOAD_HTTP_ADDRESS="127.0.0.1:$((38100 + slot))" \
         ./scripts/loadtest.sh >"$RUN_DIR/$broker/run-$repeat.path"
         generated=$(sed -n '$p' "$RUN_DIR/$broker/run-$repeat.path")
         cp "$generated" "$result"

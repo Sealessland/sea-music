@@ -107,16 +107,16 @@ flowchart LR
 以下数据均可通过仓库脚本重放，基线原始证据见 `artifacts/performance/`；测试口径与适用边界见 [docs/performance/baseline.md](docs/performance/baseline.md)（单机环境，不构成生产容量或 SLA 结论）。
 
 <!-- benchmark-ci:start -->
-> 最近一次通过门禁的 CI 基准：[workflow run](https://github.com/Sealessland/sea-music/actions/runs/31356834648) · `d01dac80b0d3` · 2026-08-10T04:58:14Z
+> 最近一次通过门禁的 CI 基准：[workflow run](https://github.com/Sealessland/sea-music/actions/runs/31992984014) · `5d676589676a` · 2026-08-17T04:06:40Z
 
 口径：`grafana/k6:2.0.0`、`constant-arrival-rate`、目标 200 RPS、持续 30s、`pareto80` 分布、200 个视频；每个对照组均执行，表中为重复运行中位数。共享 GitHub runner 数据仅用于回归比较，不代表生产 SLA。
 
 | 对照组 | 重复次数 | 实际 QPS | P95 | P99 | 错误率 | Dropped | 阈值 |
 |---|---:|---:|---:|---:|---:|---:|---|
-| `cache` | 3 | 200.02 | 0.66 ms | 1.41 ms | 0.0000% | 0 | 通过 |
-| `no-cache` | 3 | 200.03 | 0.92 ms | 1.63 ms | 0.0000% | 0 | 通过 |
+| `cache` | 3 | 200.01 | 1.07 ms | 1.64 ms | 0.0000% | 0 | 通过 |
+| `no-cache` | 3 | 200.02 | 1.44 ms | 2.36 ms | 0.0000% | 0 | 通过 |
 
-缓存相对无缓存：P95 `-27.93%`，P99 `-13.76%`（负值表示延迟降低）。
+缓存相对无缓存：P95 `-25.64%`，P99 `-30.73%`（负值表示延迟降低）。
 <!-- benchmark-ci:end -->
 
 - 固定 seed `20260713` 数据集：1,000 用户、500 视频、5,000 关注、4,000 点赞、1,500 收藏、1,000 评论、1,500 弹幕。
